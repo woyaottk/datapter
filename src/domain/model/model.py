@@ -16,10 +16,12 @@ class AdapterState(MessagesState):
     isInit: bool = True
     nextAgents: list[str] = []
     messages: list[dict] = []
+    context: str
 
 
 async def command_update(state):
     return {
         "nextAgents": state["nextAgents"],
         "messages": state["messages"],
+        "context": state["context"],
     }

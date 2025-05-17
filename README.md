@@ -62,6 +62,27 @@ conda activate datapter
 python main.py
 ```
 
+### 3. 测试curl
+
+```curl
+curl --request POST \
+  --url http://localhost:8080/aichat/chat \
+  --header 'Accept: */*' \
+  --header 'Accept-Encoding: gzip, deflate, br' \
+  --header 'Connection: keep-alive' \
+  --header 'Content-Type: application/json' \
+  --header 'User-Agent: PostmanRuntime-ApipostRuntime/1.1.0' \
+  --data '{
+    "conversation_id": "1919358918656524289",
+    "messages": [
+        {
+            "role": "user",
+            "content": "code and model limit 10 world"
+        }
+    ]
+}'
+```
+
 可在配置中自定义目标模型、适配策略、日志等级等参数。
 
 ---

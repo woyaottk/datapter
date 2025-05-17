@@ -56,7 +56,7 @@ class Router(BaseModel):
     ] = Field("下一个要使用的Agent序列")
 
 
-class Coordinator:
+class CoordinatorAgent:
     # 定义一个常量, 允许外部访问到该常量
     def __init__(self):
         self.llm = create_llm(
@@ -97,6 +97,7 @@ class Coordinator:
             response = await chain.ainvoke(
                 {"format_instructions": suggestion_parser.get_format_instructions()}
             )
+            print(response)
             goto = response.nextAgents[0]
             # goto如果等于FINISH，则return 使用slotAgent
             if goto == "FINISH":
@@ -117,6 +118,7 @@ class Coordinator:
                 update={
                     "nextAgents": remaining_agents,
                     "isInit": False,
+                    "context": "空",
                     "gotoEnd": False,
                 },
             )
@@ -149,11 +151,16 @@ class Coordinator:
         return None
 
     def build_coordinator_agent(self):
+        # 添加节点
         builder = StateGraph(AdapterState)
         builder.add_node(__name__, self.create_agent_func)
         builder.add_node(DemoAgent.__name__, DemoAgent())
         builder.add_node(Demo2Agent.__name__, Demo2Agent())
+
+        # 添加边
         builder.add_edge(START, __name__)
+        builder.add_edge(DemoAgent.__name__,__name__)
+        builder.add_edge(Demo2Agent.__name__,__name__)
         return builder.compile(
             debug=os.getenv("DEBUG", "False").strip().lower() == "true",
         )

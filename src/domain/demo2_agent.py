@@ -27,7 +27,7 @@ class Demo2Agent:
         conversation_id = state["conversationId"]
         print(f"[Demo2Agent] called, state: {{'conversationId': {conversation_id}}}")
 
-        # 从OpenSearch获取招生政策
+        print("这是demo传递给我的context：" + state["context"])
         user_question = state["messages"][-1].content
 
         prompts = ChatPromptTemplate.from_messages(

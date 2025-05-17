@@ -2,5 +2,5 @@ from enum import Enum
 
 
 class AgentTypeEnum(Enum):
-    Supervisor = "Coordinator"
+    Supervisor = "CoordinatorAgent"
     DemoAgent = "DemoAgent"

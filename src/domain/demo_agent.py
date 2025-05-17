@@ -26,8 +26,8 @@ class DemoAgent:
     async def __call__(self, state: AdapterState) -> Command:
         conversation_id = state["conversationId"]
         print(f"[DemoAgent] called, state: {{'conversationId': {conversation_id}}}")
+        print("这是Coordinator传递给我的context：" + state["context"])
 
-        # 从OpenSearch获取招生政策
         user_question = state["messages"][-1].content
 
         prompts = ChatPromptTemplate.from_messages(
@@ -47,13 +47,14 @@ class DemoAgent:
         chain = prompts | llm
 
         writer = get_stream_writer()
-
+        state["context"] = ""
         async for chunk in chain.astream(
             {
                 "user_question": user_question,
             }
         ):
             if chunk.content:
+                state["context"] = state["context"] + chunk.content
                 writer(
                     {
                         "data": AiChatResultVO(text=chunk.content).model_dump_json(
@@ -65,6 +66,8 @@ class DemoAgent:
         print(
             f"[DemoAgent] returning to: {AgentTypeEnum.Supervisor.value}, state: {{'conversationId': {conversation_id}}}"
         )
+
+        print("这是我传递给demo2的context：" + state["context"])
         return Command(
             goto=AgentTypeEnum.Supervisor.value,
             update=await command_update(state),

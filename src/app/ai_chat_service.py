@@ -7,7 +7,7 @@ from langchain_core.messages import HumanMessage
 from sse_starlette.sse import AsyncContentStream
 
 from src.adapter.vo.ai_chat_model import ChatInputVO, AiChatResultVO
-from src.domain.coordinator_agent import Coordinator
+from src.domain.coordinator_agent import CoordinatorAgent
 from src.utils.SnowFlake import Snowflake
 
 
@@ -22,7 +22,7 @@ async def chat_handler(request: ChatInputVO) -> AsyncContentStream:
     conversation_id = request.conversation_id
     try:
         try:
-            graph = Coordinator().build_coordinator_agent()
+            graph = CoordinatorAgent().build_coordinator_agent()
             messages = []
             msg = request.messages[-1]
             content = (
