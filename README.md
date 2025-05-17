@@ -64,6 +64,7 @@ python main.py
 
 ### 3. 测试curl
 
+**聊天接口**
 ```curl
 curl --request POST \
   --url http://localhost:8080/aichat/chat \
@@ -83,6 +84,21 @@ curl --request POST \
 }'
 ```
 
+**上传数据集接口**
+```curl
+curl -X POST "http://localhost:8080/aichat/upload/data" \
+  -H "accept: application/json" \
+  -H "Content-Type: multipart/form-data" \
+  -F "data_file=@/path/to/your/data.zip"
+```
+
+**上传模型接口**
+```curl
+curl -X POST "http://localhost:8080/aichat/upload/model" \
+  -H "accept: application/json" \
+  -H "Content-Type: multipart/form-data" \
+  -F "model_file=@/path/to/your/model.zip"
+```
 可在配置中自定义目标模型、适配策略、日志等级等参数。
 
 ---
