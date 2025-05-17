@@ -18,6 +18,7 @@ from langgraph.graph import StateGraph, START
 from langgraph.types import Command
 from pydantic import Field, BaseModel
 
+from src.domain.demo2_agent import Demo2Agent
 from src.domain.demo_agent import DemoAgent
 from src.domain.model.model import AdapterState
 from src.utils.llm_util import create_llm
@@ -30,7 +31,8 @@ SYSTEM_PROMPT = """
 负责判断用户输入类型并管理代理调度，根据用户的请求类型和内容，确定处理策略。
 
 # 代理职责
-- DemoAgent: 默认全部路由到这里
+- DemoAgent: 当提示词出现了code时路由到这里
+- Demo2Agent: 当提示词出现了model时路由到这里
 - FINISH: 结束对话
 
 # 输出定义:
@@ -48,6 +50,7 @@ class Router(BaseModel):
     nextAgents: List[
         Literal[
             DemoAgent.__name__,
+            Demo2Agent.__name__,
             "FINISH",
         ]
     ] = Field("下一个要使用的Agent序列")
@@ -149,6 +152,7 @@ class Coordinator:
         builder = StateGraph(AdapterState)
         builder.add_node(__name__, self.create_agent_func)
         builder.add_node(DemoAgent.__name__, DemoAgent())
+        builder.add_node(Demo2Agent.__name__, Demo2Agent())
         builder.add_edge(START, __name__)
         return builder.compile(
             debug=os.getenv("DEBUG", "False").strip().lower() == "true",
