@@ -1,6 +1,7 @@
 /myenv
 /logs/
 .idea/
+/data/
 
 # Python cache files
 *.py[cod]

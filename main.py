@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Set
 
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 from src.utils.router_manager import ProtocolType, RouterManager
 
 # 加载 .env 文件
@@ -27,6 +28,15 @@ class Server:
         print("FastAPI 应用程序已初始化")
         self._signal_handlers: Set[signal.Signals] = set()
         self.router_manager = RouterManager(gateway_port=8080)
+        
+        # 添加CORS中间件
+        self.router_manager.gateway_app.add_middleware(
+            CORSMiddleware,
+            allow_origins=[os.getenv("FRONTEND_URL")],  # 允许的前端源
+            allow_credentials=True,
+            allow_methods=["*"],  # 允许所有HTTP方法
+            allow_headers=["*"],  # 允许所有请求头
+        )
 
     async def register_router(self):
         from src.adapter.ai_chat_router import router as ai_chat
