@@ -7,11 +7,6 @@ from datetime import datetime
 import operator
 import configparser
 
-# --- Project Path Setup ---
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(current_dir)
-sys.path.insert(0, project_root)
-
 # --- LangChain/LangGraph Imports ---
 from langchain_community.llms import Tongyi
 from langchain.output_parsers import PydanticOutputParser
@@ -20,55 +15,26 @@ from langgraph.graph import StateGraph, END
 from langchain_core.messages import BaseMessage
 
 # --- Custom Tool Imports (Now as helper functions) ---
-from tools.FileTreeAnalysisTool import analyze_file_tree
-from tools.ArchiveDecompressionTool import decompress_and_create_replica
+from src.tools.FileTreeAnalysisTool import analyze_file_tree
+from src.tools.ArchiveDecompressionTool import decompress_and_create_replica
+from src.utils.llm_util import create_llm
 
 
 # === Configuration Management ===
 def load_config():
-    """Loads configurations from a central config file."""
-    config = configparser.ConfigParser()
-    config_path = os.path.join(project_root, "config", "config.cfg")
+    """Loads configurations from a environment variable."""
 
     # Default values
     config_data = {
-        "model_name": None,
-        "api_key": None,
-        "max_files_to_list": 10,
-        "output_dir": os.path.join(project_root, "output"),  # Default output dir
+        "max_files_to_list": int(os.getenv("DATASET.MAX_FILES_PER_TYPE_TO_LIST", 10)),
+        "output_dir": os.getenv("DATASET.OUTPUT_DIR"),  # Default output dir
     }
-
-    if os.path.exists(config_path):
-        config.read(config_path)
-        # Read model config
-        model_section = "model_qwen-plus_dashscope"
-        config_data["model_name"] = config.get(
-            model_section, "model_name", fallback=None
-        )
-        config_data["api_key"] = config.get(model_section, "api_key", fallback=None)
-        # Read analysis config
-        config_data["max_files_to_list"] = config.getint(
-            "Analysis", "max_files_per_type_to_list", fallback=10
-        )
-        # Read and centralize output directory config
-        config_data["output_dir"] = config.get(
-            "FileTreeAnalyzerOutput", "output_dir", fallback=config_data["output_dir"]
-        )
-    else:
-        print(f"警告: 配置文件 '{config_path}' 未找到，将使用默认值。")
 
     return config_data
 
-
 # --- Load Config and Initialize LLM ---
 config = load_config()
-os.environ["DASHSCOPE_API_KEY"] = config["api_key"]
-llm = Tongyi(
-    model=config["model_name"],
-    DASHSCOPE_API_KEY=config["api_key"],
-    temperature=0.1,
-)
-
+llm = create_llm()
 
 # === Pydantic Models (Unchanged) ===
 class EnhancedFileNode(BaseModel):
@@ -226,6 +192,8 @@ def enhance_file_tree_node(state: DatasetAnalysisState) -> DatasetAnalysisState:
     except Exception as e:
         state["error"] = f"文件树增强过程失败: {e}"
         print(f"阶段二：失败 - {state['error']}")
+        import traceback
+        traceback.print_stack()
 
     print("=== 阶段二：文件树语义增强 结束 ===")
     return state
@@ -353,9 +321,7 @@ def main():
 
     agent = DatapterAgent()
     # Provide a default path to a directory or a compressed file
-    default_input = os.path.join(
-        project_root, "demo", "input_dataset"
-    )  # Or a path to a .zip file
+    default_input = os.getenv("DATASET.INPUT_DIR")
 
     # Execute analysis
     result = agent.analyze_dataset(default_input)

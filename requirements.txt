@@ -16,3 +16,6 @@ sse-starlette~=2.2.1
 
 ruff
 
+patool==4.0.1
+typing_extensions==4.14.0
+dashscope
