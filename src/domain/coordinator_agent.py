@@ -21,7 +21,8 @@ from pydantic import Field, BaseModel
 from src.domain.demo2_agent import Demo2Agent
 from src.domain.demo_agent import DemoAgent
 from src.domain.model.model import AdapterState
-from src.utils.llm_util import create_llm
+from src.llm.llm_factory import LLMFactory
+from src.llm.model.LLMType import LLMType
 
 SYSTEM_PROMPT = """
 # 角色
@@ -59,14 +60,7 @@ class Router(BaseModel):
 class CoordinatorAgent:
     # 定义一个常量, 允许外部访问到该常量
     def __init__(self):
-        self.llm = create_llm(
-            **{
-                "model_name": os.getenv("QWEN"),
-                "api_key": os.getenv("ALIBABA_API_KEY"),
-                "api_base": os.getenv("ALIBABA_BASE_URL"),
-                "temperature": 0.2,
-            }
-        )
+        self.llm = LLMFactory.create_llm(LLMType.QWEN)
         pass
 
     async def create_agent_func(self, state: AdapterState):

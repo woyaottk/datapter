@@ -1,5 +1,3 @@
-import os
-
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate
 from langgraph.config import get_stream_writer
 from langgraph.types import Command
@@ -7,8 +5,9 @@ from langgraph.types import Command
 from src.adapter.vo.ai_chat_model import AiChatResultVO
 from src.domain.constant.constant import AgentTypeEnum
 from src.domain.model.model import AdapterState, command_update
-from src.utils.llm_util import async_create_llm
 
+from src.llm.llm_factory import LLMFactory
+from src.llm.model.LLMType import LLMType
 
 SYSTEM_PROMPT = """
 # 角色
@@ -36,7 +35,7 @@ class DemoAgent:
                 ("user", "{user_question}"),
             ]
         )
-        llm = await async_create_llm()
+        llm = await LLMFactory.async_create_llm(LLMType.QWEN)
         chain = prompts | llm
 
         writer = get_stream_writer()
