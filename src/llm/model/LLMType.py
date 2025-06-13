@@ -13,6 +13,8 @@ class LLMType(Enum):
     """LLM类型枚举"""
     QWEN = "QWEN"
     QWEN_MAX = "QWEN_MAX"
+    DEEPSEEK_CHAT = "DEEPSEEK_CHAT"
+    DEEPSEEK_REASON = "DEEPSEEK_REASON"
 
     @classmethod
     def _initialize_config_cache(cls) -> None:

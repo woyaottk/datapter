@@ -19,3 +19,4 @@ ruff
 patool==4.0.1
 typing_extensions==4.14.0
 dashscope
+langchain_deepseek
