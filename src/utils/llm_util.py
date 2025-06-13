@@ -10,7 +10,7 @@ from pydantic import SecretStr
 
 from src.utils.SnowFlake import Snowflake
 
-load_dotenv()
+load_dotenv('.env')
 
 sf = Snowflake(worker_id=0, datacenter_id=0)
 
