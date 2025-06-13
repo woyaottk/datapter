@@ -10,10 +10,11 @@ from pydantic import BaseModel, Field
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import BaseMessage
 
+from src.llm.llm_factory import LLMFactory
+from src.llm.model.LLMType import LLMType
 # --- Custom Tool Imports (Now as helper functions) ---
 from src.tools.FileTreeAnalysisTool import analyze_file_tree
 from src.tools.ArchiveDecompressionTool import decompress_and_create_replica
-from src.llm.llm_util import create_llm
 
 
 # === Configuration Management ===
@@ -30,7 +31,7 @@ def load_config():
 
 # --- Load Config and Initialize LLM ---
 config = load_config()
-llm = create_llm()
+llm = LLMFactory.create_llm(LLMType.QWEN)
 
 # === Pydantic Models (Unchanged) ===
 class EnhancedFileNode(BaseModel):
