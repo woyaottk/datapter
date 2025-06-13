@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_community.llms import Tongyi
-
+from langchain_deepseek import ChatDeepSeek
 from pydantic import SecretStr
 
 from src.utils.SnowFlake import Snowflake
@@ -20,6 +20,8 @@ class LLMType(Enum):
     QWEN = "qwen"
     QWEN_MAX = "qwen-max"
     GLM = "glm"
+    DEEPSEEK_CHAT = 'deepseek_chat'
+    DEEPSEEK_REASON = 'deepseek_reason'
 
 # 添加LLM实例缓存
 _llm_cache: Dict[str, Any] = {}
@@ -110,6 +112,20 @@ def _create_llm_by_type(config: dict, temperature: float, streaming: bool, **kwa
                 request_timeout=600,  # 增加超时时间
                 max_retries=3,  # 添加重试次数
             )
+    elif config["type"] == LLMType.DEEPSEEK_CHAT:
+        print("使用DeepSeek-chat模型")
+        return ChatDeepSeek(
+            temperature=temperature,
+            model=config['model_name'],
+            api_key=SecretStr(config["api_key"]),
+        )
+    elif config["type"] == LLMType.DEEPSEEK_REASON:
+        print("使用DeepSeek-reason模型")
+        return ChatDeepSeek(
+            temperature=temperature,
+            model=config['model_name'],
+            api_key=SecretStr(config["api_key"]),
+        )
     else:
         raise ValueError(f"Unsupported LLM type: {config['type']}")
 

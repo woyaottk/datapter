@@ -17,6 +17,9 @@ class AdapterState(MessagesState):
     nextAgents: list[str] = []
     messages: list[dict] = []
     context: str
+    model_path:str
+    model_analyse:list[dict] = []
+    model_agent_prompt = []
 
 
 async def command_update(state):
