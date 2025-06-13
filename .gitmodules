@@ -1,0 +1,3 @@
+[submodule "datapter-frontend"]
+	path = datapter-frontend
+	url = https://github.com/Ryan2ky/datapter-frontend.git

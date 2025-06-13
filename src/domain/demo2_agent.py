@@ -36,14 +36,7 @@ class Demo2Agent:
                 ("user", "{user_question}"),
             ]
         )
-        llm = await async_create_llm(
-            **{
-                "model_name": os.getenv("QWEN"),
-                "api_key": os.getenv("ALIBABA_API_KEY"),
-                "api_base": os.getenv("ALIBABA_BASE_URL"),
-                "temperature": 0.2,
-            }
-        )
+        llm = await async_create_llm()
         chain = prompts | llm
 
         writer = get_stream_writer()
