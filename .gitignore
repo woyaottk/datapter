@@ -47,3 +47,4 @@ wheels/
 env/
 venv/
 ENV/
+/src/domain/data/
