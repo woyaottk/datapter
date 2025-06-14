@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import List, Any
 from langchain_mistralai import MistralAIEmbeddings
@@ -56,8 +57,8 @@ if __name__ == "__main__":
     
     # 转换单个文本
     vector = embedding_util.embed_query("Hello, world!")
-    print(f"Vector length: {len(vector)}")
+    logging.info(f"Vector length: {len(vector)}")
     
     # 转换多个文本
     vectors = embedding_util.embed_documents(["Hello", "world"])
-    print(f"Number of vectors: {len(vectors)}") 
+    logging.info(f"Number of vectors: {len(vectors)}")
