@@ -1604,7 +1604,19 @@ class ModelAgent:
         self.agent = CodeAnalysisAgent(chat_model=LLMFactory.create_llm(LLMType.DEEPSEEK_CHAT),reason_model=LLMFactory.create_llm(LLMType.DEEPSEEK_REASON),embedding_model=EmbeddingUtil())
 
     async def __call__(self, state: AdapterState) -> Command:
-        path = state['model_path']
+        try:
+            path = state['model_path']
+        except KeyError:
+            get_stream_writer()({
+                "data": AiChatResultVO(text="❌ No model path provided").model_dump_json(
+                    exclude_none=True
+                )
+            })
+            return Command(
+                goto=AgentTypeEnum.Supervisor.value,
+                update=await command_update(state),
+            )
+
         prompt = state['model_agent_prompt'][-1]
         output = None
         for i in range(5):
@@ -1613,7 +1625,7 @@ class ModelAgent:
                 break
             else:
                 pass
-        if output!=None:
+        if output['success']:
             state['model_analyse'].append({'markdown':output['markdown'],"json_out":output['json_out'],
                     "summary":output['summary']})
             get_stream_writer()({

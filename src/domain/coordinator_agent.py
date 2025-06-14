@@ -54,9 +54,6 @@ SYSTEM_PROMPT = """
 3. 按照以下格式输出：
 
 # 输出定义:
-```
-{}
-```
 {format_instructions}
 """
 
