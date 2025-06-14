@@ -1,1 +1,1 @@
-from LLMType import LLMType
+from .LLMType import LLMType

@@ -1,25 +1,25 @@
-import os
-import json
-import shutil
 import asyncio
+import json
+import os
+import shutil
 from typing import List, Optional, Dict, Any
-from langgraph.types import Command
-from src.domain.constant.constant import AgentTypeEnum
-from src.domain.model.model import command_update
 
 # --- LangChain/LangGraph 核心库导入 ---
 from langchain.output_parsers import PydanticOutputParser
-from pydantic import BaseModel, Field
 from langchain_core.language_models import BaseLanguageModel
-from langchain_core.messages import AIMessage
+from langgraph.types import Command
+from pydantic import BaseModel, Field
 
+from src.domain.constant.constant import AgentTypeEnum
 # --- 项目内部模块导入 ---
 # Agent的状态定义从外部模型文件导入
-from model.model import DatasetAgentState
+from src.domain.model.model import DatasetAgentState
+from src.domain.model.model import command_update, AdapterState
 from src.llm.llm_factory import LLMFactory
 from src.llm.model.LLMType import LLMType
-from src.tools.FileTreeAnalysisTool import analyze_file_tree
 from src.tools.ArchiveDecompressionTool import decompress_and_create_replica
+from src.tools.FileTreeAnalysisTool import analyze_file_tree
+
 
 # === 1. Pydantic 数据结构定义 (Agent内部使用) ===
 
@@ -58,9 +58,11 @@ def load_config():
         "output_dir": os.getenv("DATASET.OUTPUT_DIR", "output"),
     }
 
+
 def _extract_summary_statistics(file_tree: Dict[str, Any]) -> Dict[str, Any]:
     """遍历文件树，提取关于省略节点的统计信息。"""
     stats = {"total_summary_nodes": 0, "total_omitted_files": 0, "summary_by_extension": {}}
+
     def _traverse(node):
         if isinstance(node, dict):
             if node.get("type") == "summary":
@@ -73,10 +75,13 @@ def _extract_summary_statistics(file_tree: Dict[str, Any]) -> Dict[str, Any]:
                 stats["summary_by_extension"][ext]["total_files"] += count
             for child in node.get("children", []):
                 _traverse(child)
+
     _traverse(file_tree.get("root", {}))
     return stats
 
-def _build_enhancement_prompt(file_tree: Dict[str, Any], summary_stats: Dict[str, Any], format_instructions: str) -> str:
+
+def _build_enhancement_prompt(file_tree: Dict[str, Any], summary_stats: Dict[str, Any],
+                              format_instructions: str) -> str:
     """构建用于AI增强的提示，包含文件省略统计的关键上下文。"""
     summary_line = (
         f"**重要提示：此文件树使用了'省略表示'功能**\n"
@@ -105,17 +110,17 @@ class DatapterAgent:
 
         pass
 
-    async def __call__(self, state: DatasetAgentState) -> Command:
+    async def __call__(self, global_state: AdapterState) -> Command:
         """
         LangGraph框架调用的主入口点。
         以批处理模式执行完整的分析流程，并返回一个包含最终输出字段的字典。
         """
+        state = None
         try:
             # --- 初始化 ---
             config = load_config()
             llm = LLMFactory.create_llm(LLMType.QWEN)
-
-
+            state = global_state.get("dataset_state")
             input_path = state.get("input_path")
             if not input_path or not await asyncio.to_thread(os.path.exists, input_path):
                 raise ValueError(f"输入路径无效或不存在: {input_path}")
@@ -128,18 +133,25 @@ class DatapterAgent:
 
             # --- 成功返回，填充状态字典 ---
             print("[DatapterAgent] 运行成功, 返回最终状态。")
-            datasetagentstate = DatasetAgentState(input_path=input_path, output_path=output_dir, saved_analysis_filename=filename, enhanced_file_tree_json=json_string)
-            state['dataset_state'] = datasetagentstate
+            state['output_path'] = output_dir
+            state['saved_analysis_filename'] = filename
+            state['enhanced_file_tree_json'] = json_string
+            global_state['dataset_state'] = state
             return Command(
-            goto=AgentTypeEnum.Supervisor.value,
-            update=await command_update(state),
-        )
-
-
+                goto=AgentTypeEnum.Supervisor.value,
+                update=await command_update(global_state),
+            )
         except Exception as e:
             error_message = f"执行过程中发生严重错误: {e}"
             print(f"[DatapterAgent] {error_message}")
-            return {"messages": [AIMessage(content=error_message)]}
+            if not state:
+                state = DatasetAgentState()
+            state['error_msg'] = error_message
+            global_state['dataset_state'] = state
+            return Command(
+                goto=AgentTypeEnum.Supervisor.value,
+                update=await command_update(global_state),
+            )
 
     async def _run_stage_0(self, input_path: str, config: dict, decompress_func) -> (str, str):
         print("--- 阶段0: 设置与解压 ---")

@@ -6,7 +6,8 @@ class DatasetAgentState(MessagesState): # TODO 新增state，未在其他地方�
     input_path: Optional[str]
     output_path: Optional[str]
     saved_analysis_filename: Optional[str] # 增强文件树json文件名
-    enhanced_file_tree_json: str # 增强后文件树内容
+    enhanced_file_tree_json: Optional[str] # 增强后文件树内容
+    error_msg: Optional[str]
 
 
 class AdapterState(MessagesState):
@@ -27,7 +28,7 @@ class AdapterState(MessagesState):
     context: str
     model_path:str
     model_analyse:list[dict] = []
-    model_agent_prompt = []
+    model_agent_prompt:list = []
     dataset_state: DatasetAgentState = None
 
 
