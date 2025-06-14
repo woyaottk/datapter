@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 import shutil
 from typing import List, Optional, Dict, Any
@@ -52,7 +53,7 @@ def load_config():
     from dotenv import load_dotenv
     try:
         # 确保.env文件路径相对于您运行脚本的位置是正确的
-        load_dotenv(r'..\..\.env')
+        load_dotenv(r'../../../.env')
     except Exception:
         print("Warning: .env file not found. Using default environment variables.")
 
@@ -136,7 +137,7 @@ class DatasetAgent:
             config = load_config()
             llm = LLMFactory.create_llm(LLMType.QWEN)
             state = global_state.get("dataset_state")
-            input_path = state.get("input_path")
+            input_path = state.get("input_path",".")
             if not input_path or not await asyncio.to_thread(os.path.exists, input_path):
                 raise ValueError(f"输入路径无效或不存在: {input_path}")
 
@@ -149,7 +150,7 @@ class DatasetAgent:
             filename, json_string = await self._run_stage_5_save_results(enhanced_tree_dict, output_dir)
 
             # --- 成功返回，填充状态字典 ---
-            print("[DatasetAgent] 运行成功, 返回最终状态。")
+            logging.info("[DatasetAgent] 运行成功, 返回最终状态。")
             state['output_path'] = output_dir
             state['saved_analysis_filename'] = filename
             state['enhanced_file_tree_json'] = json_string
@@ -160,7 +161,7 @@ class DatasetAgent:
             )
         except Exception as e:
             error_message = f"执行过程中发生严重错误: {e}"
-            print(f"[DatasetAgent] {error_message}")
+            logging.info(f"[DatasetAgent] {error_message}")
             if not state:
                 state = DatasetAgentState()
             state['error_msg'] = error_message
@@ -172,7 +173,7 @@ class DatasetAgent:
 
     async def _run_stage_1_setup(self, input_path: str, config: dict, decompress_func) -> (str, str):
         """阶段 1: 设置工作目录并解压源文件。"""
-        print("--- 阶段 1: 设置与解压 ---")
+        logging.info("--- 阶段 1: 设置与解压 ---")
         base_name = os.path.basename(input_path.rstrip("/\\")).split(".")[0]
         run_output_dir = os.path.join(config["output_dir"], base_name)
 
@@ -189,7 +190,7 @@ class DatasetAgent:
     async def _run_stage_2_analyze_tree(self, processed_dir: str, output_dir: str, config: dict, analyze_func) -> Dict[
         str, Any]:
         """阶段 2: 分析文件树结构。"""
-        print("--- 阶段 2: 分析文件树 ---")
+        logging.info("--- 阶段 2: 分析文件树 ---")
         result = await asyncio.to_thread(
             analyze_func,
             dataset_root_dir=processed_dir,
@@ -203,7 +204,7 @@ class DatasetAgent:
     async def _run_stage_3_read_metadata(self, raw_file_tree: dict, processed_dir: str, config: dict, read_meta_func) -> \
     Dict[str, Any]:
         """阶段 3: 读取文件元数据并丰富文件树。"""
-        print("--- 阶段 3: 读取文件元数据 ---")
+        logging.info("--- 阶段 3: 读取文件元数据 ---")
         sample_size = config["sample_size"]
 
         async def traverse_and_enrich(node: Dict[str, Any], current_path: str):
@@ -228,12 +229,12 @@ class DatasetAgent:
         meta_tree_path = os.path.join(processed_dir, "metadata_enriched_tree.json")
         with open(meta_tree_path, 'w', encoding='utf-8') as f:
             json.dump(tree_copy, f, ensure_ascii=False, indent=2)
-        print(f"带有元数据的文件树已保存至: {meta_tree_path}")
+        logging.info(f"带有元数据的文件树已保存至: {meta_tree_path}")
         return tree_copy
 
     async def _run_stage_4_enhance_tree(self, metadata_enriched_tree: dict, llm: BaseLanguageModel) -> Dict[str, Any]:
         """阶段 4: 使用AI进行语义增强。"""
-        print("--- 阶段 4: AI语义增强 ---")
+        logging.info("--- 阶段 4: AI语义增强 ---")
         summary_stats = _extract_summary_statistics(metadata_enriched_tree)
 
         parser = PydanticOutputParser(pydantic_object=EnhancedFileTree)
@@ -247,7 +248,7 @@ class DatasetAgent:
 
     async def _run_stage_5_save_results(self, enhanced_tree_dict: dict, output_dir: str) -> (str, str):
         """阶段 5: 保存最终结果并完成。"""
-        print("--- 阶段 5: 保存并完成 ---")
+        logging.info("--- 阶段 5: 保存并完成 ---")
         filename = "enhanced_analysis.json"
         output_file_path = os.path.join(output_dir, filename)
 
@@ -257,6 +258,5 @@ class DatasetAgent:
 
         await asyncio.to_thread(_save_json)
         json_string = json.dumps(enhanced_tree_dict, ensure_ascii=False, indent=2)
-        print(f"最终结果已保存至: {output_file_path}")
+        logging.info(f"最终结果已保存至: {output_file_path}")
         return filename, json_string
-

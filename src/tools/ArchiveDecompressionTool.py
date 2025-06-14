@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import tarfile
@@ -55,9 +56,9 @@ def decompress_archive(file_path: str, output_dir: str):
                     shutil.copyfileobj(f_in, f_out)
         else:
             patoolib.extract_archive(file_path, outdir=output_dir, verbosity=-1)
-        print(f"  - 成功解压 '{os.path.basename(file_path)}' 到 '{output_dir}'")
+        logging.info(f"  - 成功解压 '{os.path.basename(file_path)}' 到 '{output_dir}'")
     except Exception as e:
-        print(f"  - 错误: 解压 '{os.path.basename(file_path)}' 失败: {e}")
+        logging.error(f"  - 错误: 解压 '{os.path.basename(file_path)}' 失败: {e}")
         pass
 
 
@@ -88,12 +89,12 @@ def decompress_and_create_replica(source_path: str, target_dir: str) -> str:
                     shutil.copy2(s_item, d_item)
         else:  # Source is a file
             shutil.copy2(source_path, target_dir)
-        print("源内容已复制到目标目录。")
+        logging.info("源内容已复制到目标目录。")
 
         # Iteratively decompress archives inside the target_dir
         iteration = 1
         while True:
-            print(f"\n--- 第 {iteration} 轮扫描和解压 ---")
+            logging.info(f"\n--- 第 {iteration} 轮扫描和解压 ---")
             all_files_in_target = find_all_files(target_dir)
             compressed_files = [f for f in all_files_in_target if is_compressed_file(f)]
 
@@ -101,7 +102,7 @@ def decompress_and_create_replica(source_path: str, target_dir: str) -> str:
                 print("未发现新的压缩文件，处理完成。")
                 break
 
-            print(f"发现 {len(compressed_files)} 个压缩文件需要处理...")
+            logging.info(f"发现 {len(compressed_files)} 个压缩文件需要处理...")
             for archive_path in compressed_files:
                 archive_base_name = os.path.basename(archive_path)
                 extract_folder_name = (
@@ -115,14 +116,14 @@ def decompress_and_create_replica(source_path: str, target_dir: str) -> str:
                 decompress_archive(archive_path, extract_dir)
                 try:
                     os.remove(archive_path)
-                    print(f"  - 已删除原始压缩包: '{archive_base_name}'")
+                    logging.info(f"  - 已删除原始压缩包: '{archive_base_name}'")
                 except OSError as e:
-                    print(f"  - 警告: 删除压缩包 '{archive_base_name}' 失败: {e}")
+                    logging.error(f"  - 警告: 删除压缩包 '{archive_base_name}' 失败: {e}")
             iteration += 1
 
-        print(f"\n解压和复制完成。最终副本根目录: {target_dir}")
+        logging.info(f"\n解压和复制完成。最终副本根目录: {target_dir}")
         return target_dir
 
     except Exception as e:
-        print(f"处理过程中发生严重错误: {e}")
+        logging.error(f"处理过程中发生严重错误: {e}")
         raise ValueError(f"处理失败: {e}")

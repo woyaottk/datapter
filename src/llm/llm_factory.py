@@ -1,7 +1,9 @@
+import logging
 from typing import Any, Dict, Type
 import asyncio
 from dotenv import load_dotenv
 
+from src.llm.factory.deepseek_factory import DeepSeekFactory
 from src.llm.factory.openai_factory import OpenAIFactory
 from src.llm.factory.tongyi_factory import TongyiFactory
 from src.llm.model.LLMType import LLMType
@@ -20,7 +22,9 @@ class LLMFactory:
     # 工厂类映射
     _factory_map: Dict[LLMType, Type] = {
         LLMType.QWEN: OpenAIFactory,
-        # LLMType.QWEN_MAX: TongyiFactory,
+        LLMType.QWEN_MAX: TongyiFactory,
+        LLMType.DEEPSEEK_CHAT: DeepSeekFactory,
+        LLMType.DEEPSEEK_REASON: DeepSeekFactory,
     }
 
     @classmethod
@@ -212,6 +216,6 @@ if __name__ == "__main__":
     # 异步创建 Qwen 模型实例
     async def main():
         qwen_llm2 = await LLMFactory.async_create_llm(LLMType.QWEN)
-        print("Async LLM created successfully")
+        logging.info("Async LLM created successfully")
 
     asyncio.run(main())

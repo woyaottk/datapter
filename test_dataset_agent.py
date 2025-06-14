@@ -1,12 +1,12 @@
 import os
-from src.domain.dataset_agent_lg import DatasetAgent
+from src.domain.agent.dataset_agent import DatasetAgent
 
 from dotenv import load_dotenv
 load_dotenv('.env')
 
 async def test_dataset_agent():
     """
-    测试 DatasetAgent 的核心逻辑是否能正常运行。
+    测试 DatapterAgent 的核心逻辑是否能正常运行。
     模拟 chat_handler 中的行为，构建并执行一个 Agent。
     """
     # 1. 准备输入参数（state）

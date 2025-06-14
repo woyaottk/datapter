@@ -6,7 +6,7 @@ from pydantic import SecretStr
 
 
 class DeepSeekFactory:
-    """OpenAI模型工厂类，用于创建基于OpenAI API的LLM实例"""
+    """DeepSeek模型工厂类，用于创建基于DeepSeek API的LLM实例"""
 
     @staticmethod
     def create_llm(
@@ -15,7 +15,7 @@ class DeepSeekFactory:
             streaming: bool,
             **kwargs
     ) -> Any:
-        """创建基于OpenAI API的LLM实例
+        """创建基于DeepSeek API的LLM实例
 
         Args:
             config (Dict[str, Any]): 模型配置
