@@ -13,12 +13,9 @@ import datetime
 import json
 from typing import Dict, List, Any
 
-# 设置环境变量
-os.environ["GOOGLE_API_KEY"] = "AIzaSyBsCZpK4qrkcJ-HNyjkIT46TvNkjDZTz8s"
-os.environ['DEEPSEEK_API_KEY'] = "sk-dafd267ef30048f7a371a397628852de"
 
 # 导入所需模块
-from langchain_deepseek import ChatDeepSeek
+# from langchain_deepseek import ChatDeepSeek
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
@@ -28,12 +25,13 @@ from langgraph.graph import StateGraph, MessagesState, START, END
 
 # RAG系统相关导入
 from langchain_chroma import Chroma
-from langchain_core.documents import Document
+# from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import PromptTemplate
-
+from src.llm import LLMFactory, LLMType
+from src.utils.embedding_util import EmbeddingUtil
 writer = get_stream_writer()
 
 # 定义状态类
@@ -991,25 +989,25 @@ class CodeAnalysisAgent:
         
         print("CodeAnalysisAgent initialized with professional RAG system")
     
-    def _initialize_embeddings(self):
-        """初始化嵌入模型，优先使用Google多语言嵌入"""
-        # 首先尝试Google多语言嵌入模型
-        try:
-            from langchain_mistralai import MistralAIEmbeddings
-            os.environ["MISTRAL_API_KEY"] = "ajdw9kGwkGNh6QwSdFa1jAlpP7TEr45t"
-            embeddings = MistralAIEmbeddings(
-                model="mistral-embed",
-            )
-            return embeddings
-        except Exception as e:
-            print(f"MistralAIEmbeddings embeddings failed: {e}, trying fallback...")
-        try:
-            print("Using local HuggingFace embeddings...")
-            from langchain_huggingface import HuggingFaceEmbeddings
-            return HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-        except ImportError:
-            print("Warning: No embedding model available")
-            return None
+    # def _initialize_embeddings(self):
+    #     """初始化嵌入模型，优先使用Google多语言嵌入"""
+    #     # 首先尝试Google多语言嵌入模型
+    #     try:
+    #         from langchain_mistralai import MistralAIEmbeddings
+    #         os.environ["MISTRAL_API_KEY"] = "ajdw9kGwkGNh6QwSdFa1jAlpP7TEr45t"
+    #         embeddings = MistralAIEmbeddings(
+    #             model="mistral-embed",
+    #         )
+    #         return embeddings
+    #     except Exception as e:
+    #         print(f"MistralAIEmbeddings embeddings failed: {e}, trying fallback...")
+    #     try:
+    #         print("Using local HuggingFace embeddings...")
+    #         from langchain_huggingface import HuggingFaceEmbeddings
+    #         return HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    #     except ImportError:
+    #         print("Warning: No embedding model available")
+    #         return None
     
     def _initialize_vectorstore(self):
         """初始化向量数据库"""
@@ -1606,7 +1604,7 @@ Historical Context Used: {'Yes' if len(self.analysis_history) > 1 else 'No'}
 class model_agent:
     def __init__(self):
 
-        self.agent = CodeAnalysisAgent(chat_model=,reason_model=,embedding_model=)
+        self.agent = CodeAnalysisAgent(chat_model=LLMFactory.async_create_llm(LLMType.DEEPSEEK_CHAT),reason_model=LLMFactory.async_create_llm(LLMType.DEEPSEEK_REASON),embedding_model=EmbeddingUtil())
 
     async def __call__(self, state: AdapterState) -> Command:
         path = state['model_path']
