@@ -27,3 +27,4 @@ langchain_deepseek
 langchain_mistralai
 pandas
 pillow
+colorlog

@@ -1,10 +1,30 @@
 import asyncio
 import logging
+import colorlog
 import os
 import signal
 import sys
 from pathlib import Path
 from typing import Set
+
+# 配置带颜色的日志输出
+handler = colorlog.StreamHandler()
+formatter = colorlog.ColoredFormatter(
+    "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    log_colors={
+        'DEBUG': 'cyan',
+        'INFO': 'green',
+        'WARNING': 'yellow',
+        'ERROR': 'red',
+        'CRITICAL': 'bold_red',
+    }
+)
+handler.setFormatter(formatter)
+
+logging.basicConfig(
+    level=logging.INFO,
+    handlers=[handler]
+)
 
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
