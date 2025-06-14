@@ -120,7 +120,7 @@ def _build_enhancement_prompt(file_tree: Dict[str, Any], summary_stats: Dict[str
 
 # === 3. 主要智能体类 ===
 
-class DatapterAgent:
+class DatasetAgent:
     def __init__(self):
         """初始化智能体。"""
         pass
@@ -149,7 +149,7 @@ class DatapterAgent:
             filename, json_string = await self._run_stage_5_save_results(enhanced_tree_dict, output_dir)
 
             # --- 成功返回，填充状态字典 ---
-            print("[DatapterAgent] 运行成功, 返回最终状态。")
+            print("[DatasetAgent] 运行成功, 返回最终状态。")
             state['output_path'] = output_dir
             state['saved_analysis_filename'] = filename
             state['enhanced_file_tree_json'] = json_string
@@ -160,7 +160,7 @@ class DatapterAgent:
             )
         except Exception as e:
             error_message = f"执行过程中发生严重错误: {e}"
-            print(f"[DatapterAgent] {error_message}")
+            print(f"[DatasetAgent] {error_message}")
             if not state:
                 state = DatasetAgentState()
             state['error_msg'] = error_message
