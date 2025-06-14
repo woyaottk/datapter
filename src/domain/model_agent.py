@@ -1601,7 +1601,7 @@ Historical Context Used: {'Yes' if len(self.analysis_history) > 1 else 'No'}
 
 
 
-class model_agent:
+class ModelAgent:
     def __init__(self):
 
         self.agent = CodeAnalysisAgent(chat_model=LLMFactory.async_create_llm(LLMType.DEEPSEEK_CHAT),reason_model=LLMFactory.async_create_llm(LLMType.DEEPSEEK_REASON),embedding_model=EmbeddingUtil())
