@@ -12,13 +12,13 @@ from pydantic import BaseModel, Field
 
 from src.domain.constant.constant import AgentTypeEnum
 # --- 项目内部模块导入 ---
-# Agent的状态定义从外部模型文件导入
 from src.domain.model.model import DatasetAgentState
 from src.domain.model.model import command_update, AdapterState
 from src.llm.llm_factory import LLMFactory
 from src.llm.model.LLMType import LLMType
 from src.tools.ArchiveDecompressionTool import decompress_and_create_replica
 from src.tools.FileTreeAnalysisTool import analyze_file_tree
+from src.tools.MetaFileReadTool import read_file_metadata
 
 
 # === 1. Pydantic 数据结构定义 (Agent内部使用) ===
@@ -28,6 +28,9 @@ class EnhancedFileNode(BaseModel):
     type: str = Field(description="节点类型：'file', 'directory', 或 'summary'。")
     size: Optional[int] = Field(default=None, description="文件大小（字节）。")
     children: Optional[List["EnhancedFileNode"]] = Field(default=None, description="子节点列表。")
+    # new feature: add meta data info
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="从文件中提取的元数据，如图像尺寸或CSV列名。")
+
     description: Optional[str] = Field(default=None, description="节点描述。")
     count: Optional[int] = Field(default=None, description="省略表示的文件总数。")
     extension: Optional[str] = Field(default=None, description="省略表示的文件扩展名。")
@@ -56,6 +59,7 @@ def load_config():
     return {
         "max_files_to_list": int(os.getenv("DATASET.MAX_FILES_PER_TYPE_TO_LIST", 10)),
         "output_dir": os.getenv("DATASET.OUTPUT_DIR", "output"),
+        "sample_size": int(os.getenv("DATASET.SAMPLE_SIZE", 5)),  # 用于元数据采样
     }
 
 
@@ -82,18 +86,30 @@ def _extract_summary_statistics(file_tree: Dict[str, Any]) -> Dict[str, Any]:
 
 def _build_enhancement_prompt(file_tree: Dict[str, Any], summary_stats: Dict[str, Any],
                               format_instructions: str) -> str:
-    """构建用于AI增强的提示，包含文件省略统计的关键上下文。"""
+    """构建用于AI增强的提示，包含文件元数据上下文和更严格的指令。"""
+    # --- 修正了对 summary 节点的解释 ---
     summary_line = (
-        f"**重要提示：此文件树使用了'省略表示'功能**\n"
-        f"- 当文件夹中有大量同类型文件时，只显示前几个文件，其余用 `type: \"summary\"` 的节点表示。\n"
-        f"- 本次分析发现了 {summary_stats.get('total_summary_nodes', 0)} 个省略节点，共省略了 {summary_stats.get('total_omitted_files', 0)} 个文件。"
+        "**极其重要的指令：关于'省略表示'的正确理解**\n"
+        "- 文件树中的`type: \"summary\"`节点用于表示一个文件夹中大量的同类型文件。\n"
+        "- 一个`summary`节点中的`count`字段，例如`\"count\": 166`，代表该目录下此类文件的 **绝对总数**。\n"
+        "- **请绝对不要将`summary`节点旁边列出的几个文件示例的数量与`count`字段相加**。如果看到5个`.png`文件示例和一个`count: 166`的`.png`摘要，这意味着总共有166个`.png`文件，而不是171个。错误地相加会严重影响分析结果。"
     )
 
-    return f"""你是一个数据集文件结构分析智能体。你的任务是分析输入的JSON格式文件树，并返回一个结构完全相同但语义增强的文件树。
+    # --- 更新了对新元数据格式的解释 ---
+    metadata_instructions = (
+        "**元数据可用性与格式说明**:\n"
+        "- 文件节点中的`metadata`字段包含两种格式：\n"
+        "  1. **`{\"type\": \"structured\", \"data\": {...}}`**: 用于非文本文件（如图片）。`data`字段包含结构化的键值对（如`width`, `height`）。请直接利用这些信息。\n"
+        "  2. **`{\"type\": \"raw_sample\", \"content\": \"...\"}`**: 用于文本文件（如CSV, Parquet, JSON）。`content`字段包含文件开头的原始文本样本。**你需要自行分析这段文本**来推断其结构、列名、数据类型等信息。\n"
+        "- 如果`metadata`包含`error`字段，说明文件读取失败，你可以基于此进行标注。"
+    )
+
+    return f"""你是一个顶尖的数据集文件结构分析专家。你的任务是分析输入的JSON格式文件树，并返回一个结构完全相同但语义增强的文件树。
 {summary_line}
-**关键指令:**
-1. **保持原始结构**: 绝对不能修改 `name`, `type`, `size`, `children`, `count`, `extension` 等原始字段。
-2. **理解省略表示**: 基于 `count` 和 `extension` 推断这些文件的用途和重要性。
+{metadata_instructions}
+**核心指令:**
+1. **精确理解元数据**: 严格按照上述两种格式解读`metadata`字段，对`raw_sample`内容进行深入分析。
+2. **保持原始结构**: 绝对不能修改 `name`, `type`, `size`, `children`, `count`, `extension`, `metadata` 等原始字段。
 3. **全面语义标注**: 为每个节点添加 `description`, `format`, `is_data_container`, `purpose_tag`, `data_type_suggestion`, `relevance_group_id` 字段。
 **输出格式:**
 {format_instructions}
@@ -107,7 +123,6 @@ def _build_enhancement_prompt(file_tree: Dict[str, Any], summary_stats: Dict[str
 class DatapterAgent:
     def __init__(self):
         """初始化智能体。"""
-
         pass
 
     async def __call__(self, global_state: AdapterState) -> Command:
@@ -125,11 +140,13 @@ class DatapterAgent:
             if not input_path or not await asyncio.to_thread(os.path.exists, input_path):
                 raise ValueError(f"输入路径无效或不存在: {input_path}")
 
-            # --- 依次执行各个阶段，通过局部变量传递数据 ---
-            output_dir, processed_dir = await self._run_stage_0(input_path, config, decompress_and_create_replica)
-            raw_file_tree = await self._run_stage_1(processed_dir, output_dir, config, analyze_file_tree)
-            enhanced_tree_dict = await self._run_stage_2(raw_file_tree, llm)
-            filename, json_string = await self._run_stage_3(enhanced_tree_dict, output_dir)
+            # --- 按新的 5 个阶段顺序执行 ---
+            output_dir, processed_dir = await self._run_stage_1_setup(input_path, config, decompress_and_create_replica)
+            raw_file_tree = await self._run_stage_2_analyze_tree(processed_dir, output_dir, config, analyze_file_tree)
+            metadata_enriched_tree = await self._run_stage_3_read_metadata(raw_file_tree, processed_dir, config,
+                                                                           read_file_metadata)
+            enhanced_tree_dict = await self._run_stage_4_enhance_tree(metadata_enriched_tree, llm)
+            filename, json_string = await self._run_stage_5_save_results(enhanced_tree_dict, output_dir)
 
             # --- 成功返回，填充状态字典 ---
             print("[DatapterAgent] 运行成功, 返回最终状态。")
@@ -153,8 +170,9 @@ class DatapterAgent:
                 update=await command_update(global_state),
             )
 
-    async def _run_stage_0(self, input_path: str, config: dict, decompress_func) -> (str, str):
-        print("--- 阶段0: 设置与解压 ---")
+    async def _run_stage_1_setup(self, input_path: str, config: dict, decompress_func) -> (str, str):
+        """阶段 1: 设置工作目录并解压源文件。"""
+        print("--- 阶段 1: 设置与解压 ---")
         base_name = os.path.basename(input_path.rstrip("/\\")).split(".")[0]
         run_output_dir = os.path.join(config["output_dir"], base_name)
 
@@ -168,39 +186,68 @@ class DatapterAgent:
         )
         return run_output_dir, processed_path
 
-    async def _run_stage_1(self, processed_dir: str, output_dir: str, config: dict, analyze_func) -> Dict[str, Any]:
-        print("--- 阶段1: 分析文件树 ---")
+    async def _run_stage_2_analyze_tree(self, processed_dir: str, output_dir: str, config: dict, analyze_func) -> Dict[
+        str, Any]:
+        """阶段 2: 分析文件树结构。"""
+        print("--- 阶段 2: 分析文件树 ---")
         result = await asyncio.to_thread(
             analyze_func,
             dataset_root_dir=processed_dir,
             output_dir=output_dir,
             max_files_to_list=config["max_files_to_list"],
         )
-
         if "error" in result:
             raise RuntimeError(f"文件树分析失败: {result.get('error')}")
-
         return result
 
-    async def _run_stage_2(self, raw_file_tree: dict, llm: BaseLanguageModel) -> Dict[str, Any]:
-        print("--- 阶段2: AI语义增强 ---")
-        summary_stats = _extract_summary_statistics(raw_file_tree)
-        print(
-            f"检测到 {summary_stats['total_summary_nodes']} 个省略节点，共 {summary_stats['total_omitted_files']} 个文件。")
+    async def _run_stage_3_read_metadata(self, raw_file_tree: dict, processed_dir: str, config: dict, read_meta_func) -> \
+    Dict[str, Any]:
+        """阶段 3: 读取文件元数据并丰富文件树。"""
+        print("--- 阶段 3: 读取文件元数据 ---")
+        sample_size = config["sample_size"]
+
+        async def traverse_and_enrich(node: Dict[str, Any], current_path: str):
+            """递归函数，用于遍历树并调用元数据读取工具。"""
+            node_abs_path = os.path.join(current_path, node["name"])
+
+            if node.get("type") == "file":
+                metadata = await asyncio.to_thread(read_meta_func, node_abs_path, sample_size=sample_size)
+                if metadata:
+                    node["metadata"] = metadata
+
+            if node.get("type") == "directory" and "children" in node and node["children"]:
+                for child in node["children"]:
+                    await traverse_and_enrich(child, node_abs_path)
+
+        tree_copy = json.loads(json.dumps(raw_file_tree))
+
+        root_node = tree_copy.get("root")
+        if root_node:
+            await traverse_and_enrich(root_node, os.path.dirname(processed_dir))
+
+        meta_tree_path = os.path.join(processed_dir, "metadata_enriched_tree.json")
+        with open(meta_tree_path, 'w', encoding='utf-8') as f:
+            json.dump(tree_copy, f, ensure_ascii=False, indent=2)
+        print(f"带有元数据的文件树已保存至: {meta_tree_path}")
+        return tree_copy
+
+    async def _run_stage_4_enhance_tree(self, metadata_enriched_tree: dict, llm: BaseLanguageModel) -> Dict[str, Any]:
+        """阶段 4: 使用AI进行语义增强。"""
+        print("--- 阶段 4: AI语义增强 ---")
+        summary_stats = _extract_summary_statistics(metadata_enriched_tree)
 
         parser = PydanticOutputParser(pydantic_object=EnhancedFileTree)
         format_instructions = parser.get_format_instructions()
-
-        # 将统计信息传入prompt构建函数
-        prompt = _build_enhancement_prompt(raw_file_tree, summary_stats, format_instructions)
+        prompt = _build_enhancement_prompt(metadata_enriched_tree, summary_stats, format_instructions)
 
         response_message = await llm.ainvoke(prompt)
         enhanced_tree_obj = parser.parse(response_message.content)
 
         return enhanced_tree_obj.model_dump()
 
-    async def _run_stage_3(self, enhanced_tree_dict: dict, output_dir: str) -> (str, str):
-        print("--- 阶段3: 保存并完成 ---")
+    async def _run_stage_5_save_results(self, enhanced_tree_dict: dict, output_dir: str) -> (str, str):
+        """阶段 5: 保存最终结果并完成。"""
+        print("--- 阶段 5: 保存并完成 ---")
         filename = "enhanced_analysis.json"
         output_file_path = os.path.join(output_dir, filename)
 
@@ -209,8 +256,7 @@ class DatapterAgent:
                 json.dump(enhanced_tree_dict, f, ensure_ascii=False, indent=2)
 
         await asyncio.to_thread(_save_json)
-
         json_string = json.dumps(enhanced_tree_dict, ensure_ascii=False, indent=2)
-
         print(f"最终结果已保存至: {output_file_path}")
         return filename, json_string
+
