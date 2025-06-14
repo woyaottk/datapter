@@ -1,3 +1,4 @@
+import logging
 import os
 import json
 from collections import defaultdict
@@ -40,9 +41,9 @@ def analyze_file_tree(
                         }
                         file_groups[file_ext].append(file_info)
                     except OSError as stat_error:
-                        print(f"警告：无法获取文件信息 '{entry.path}': {stat_error}")
+                        logging.error(f"警告：无法获取文件信息 '{entry.path}': {stat_error}")
         except OSError as scan_error:
-            print(f"错误：无法扫描目录 '{current_dir}': {scan_error}")
+            logging.error(f"错误：无法扫描目录 '{current_dir}': {scan_error}")
             dir_info["error"] = f"Could not scan directory: {scan_error}"
             return dir_info
 
@@ -66,7 +67,7 @@ def analyze_file_tree(
 
     if not os.path.isdir(dataset_root_dir):
         error_msg = f"Input path is not a valid directory: {dataset_root_dir}"
-        print(f"错误：{error_msg}")
+        logging.error(f"错误：{error_msg}")
         return {"error": error_msg}
 
     # Start the analysis from the root directory
@@ -77,7 +78,7 @@ def analyze_file_tree(
     # Save the output to the directory provided by the agent
     dataset_basename = os.path.basename(dataset_root_dir.rstrip("/\\"))
     output_path = os.path.join(output_dir, f"{dataset_basename}_raw_file_tree.json")
-    print(f"保存文件树结构到: {output_path}")
+    logging.info(f"保存文件树结构到: {output_path}")
 
     try:
         # Wrap the result in a 'root' key to match Pydantic model expectations
@@ -85,7 +86,7 @@ def analyze_file_tree(
             json.dump({"root": final_json_structure}, f, ensure_ascii=False, indent=2)
     except IOError as write_error:
         error_msg = f"Failed to write output file: {write_error}"
-        print(f"错误：{error_msg}")
+        logging.error(f"错误：{error_msg}")
         final_json_structure["write_error"] = error_msg
 
     # Return the structure that will be passed to the LLM, wrapped in 'root'

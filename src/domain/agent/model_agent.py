@@ -2,7 +2,7 @@ from langgraph.config import get_stream_writer
 from langgraph.types import Command
 
 from src.adapter.vo.ai_chat_model import AiChatResultVO
-from src.domain.code_analysis_agent import CodeAnalysisAgent
+from src.domain.agent.code_analysis_agent import CodeAnalysisAgent
 from src.domain.constant.constant import AgentTypeEnum
 from src.domain.model.model import AdapterState, command_update
 

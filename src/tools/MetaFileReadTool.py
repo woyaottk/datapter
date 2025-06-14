@@ -1,3 +1,4 @@
+import logging
 import os
 import json
 import pandas as pd
@@ -146,7 +147,7 @@ def read_file_metadata(file_path: str, sample_size: int = 5) -> Dict[str, Any]:
     reader_func = METADATA_READERS.get(ext)
 
     if reader_func:
-        print(f"  [MetaRead] 使用 '{reader_func.__name__}' 读取 '{os.path.basename(file_path)}'")
+        logging.info(f"  [MetaRead] 使用 '{reader_func.__name__}' 读取 '{os.path.basename(file_path)}'")
         return reader_func(file_path, sample_size=sample_size)
     else:
         return {"status": "unsupported_type", "extension": ext}
@@ -156,4 +157,4 @@ if __name__ == "__main__":
     # 测试代码
     test_file = r"D:\Code\datapter\data\output\input_dataset\opus-100\af-en\train-00000-of-00001.parquet"
     result = read_file_metadata(test_file, sample_size=5)
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    logging.info(json.dumps(result, indent=2, ensure_ascii=False))

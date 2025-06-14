@@ -1,3 +1,4 @@
+import logging
 import os
 
 from langgraph.config import get_stream_writer
@@ -61,12 +62,12 @@ class CodeAnalysisAgent:
         # 工具模型代理（将在action中动态创建）
         self.tool_agent = None
 
-        print("CodeAnalysisAgent initialized with professional RAG system")
+        logging.info("CodeAnalysisAgent initialized with professional RAG system")
 
     def _initialize_vectorstore(self):
         """初始化向量数据库"""
         if self.embeddings is None:
-            print("Warning: No embeddings available, using in-memory storage")
+            logging.info("Warning: No embeddings available, using in-memory storage")
             return None
 
         return Chroma(
@@ -151,11 +152,11 @@ Enhanced Analysis:"""
 
                 # 添加到向量数据库
                 self.vectorstore.add_documents(docs)
-                print(f"Stored analysis history in vector store. Total records: {len(self.analysis_history)}")
+                logging.info(f"Stored analysis history in vector store. Total records: {len(self.analysis_history)}")
             except Exception as e:
-                print(f"Failed to store in vector database: {e}")
+                logging.error(f"Failed to store in vector database: {e}")
         else:
-            print(f"Stored analysis history in memory. Total records: {len(self.analysis_history)}")
+            logging.info(f"Stored analysis history in memory. Total records: {len(self.analysis_history)}")
 
     def _create_enhanced_prompt(self, original_prompt, target_path):
         """使用RAG系统创建增强的prompt"""
@@ -187,7 +188,7 @@ Enhanced Analysis:"""
             return enhanced_prompt
 
         except Exception as e:
-            print(f"RAG enhancement failed: {e}, using original prompt")
+            logging.error(f"RAG enhancement failed: {e}, using original prompt")
             return original_prompt
 
     def action(self, target_path="./", additional_prompt=""):
@@ -197,15 +198,15 @@ Enhanced Analysis:"""
         if not target_path.endswith('/'):
             target_path += '/'
 
-        print(f"Starting analysis for path: {target_path}")
-        print(f"Additional prompt length: {len(additional_prompt)} characters")
+        logging.info(f"Starting analysis for path: {target_path}")
+        logging.info(f"Additional prompt length: {len(additional_prompt)} characters")
 
         # 检查目标路径是否存在
         if os.path.exists(target_path):
-            print(f"Target directory exists: {os.listdir(target_path)[:10]}")
+            logging.info(f"Target directory exists: {os.listdir(target_path)[:10]}")
         else:
-            print(f"Warning: Target path {target_path} does not exist, falling back to current directory")
-            target_path = "./"
+            logging.info(f"Warning: Target path {target_path} does not exist, falling back to current directory")
+            target_path = "../"
 
         # 使用全局变量以保持与现有代码兼容
         global tool_model, reason_model, tool_agent
@@ -328,19 +329,19 @@ Enhanced Analysis:"""
             enhanced_base_prompt = base_prompt
 
         # 使用RAG系统增强prompt
-        print(f"🧠 [RAG_ENHANCEMENT] 开始使用RAG系统增强prompt...")
-        print(f"🧠 [RAG_ENHANCEMENT] 原始prompt长度: {len(enhanced_base_prompt)} 字符")
-        print(f"🧠 [RAG_ENHANCEMENT] 历史记录数量: {len(self.analysis_history)}")
+        logging.info(f"🧠 [RAG_ENHANCEMENT] 开始使用RAG系统增强prompt...")
+        logging.info(f"🧠 [RAG_ENHANCEMENT] 原始prompt长度: {len(enhanced_base_prompt)} 字符")
+        logging.info(f"🧠 [RAG_ENHANCEMENT] 历史记录数量: {len(self.analysis_history)}")
 
         final_prompt = self._create_enhanced_prompt(enhanced_base_prompt, target_path)
 
-        print(f"🧠 [RAG_ENHANCEMENT] 增强后prompt长度: {len(final_prompt)} 字符")
-        print(f"🧠 [RAG_ENHANCEMENT] 长度增加: {len(final_prompt) - len(enhanced_base_prompt)} 字符")
+        logging.info(f"🧠 [RAG_ENHANCEMENT] 增强后prompt长度: {len(final_prompt)} 字符")
+        logging.info(f"🧠 [RAG_ENHANCEMENT] 长度增加: {len(final_prompt) - len(enhanced_base_prompt)} 字符")
 
         if len(final_prompt) > len(enhanced_base_prompt):
-            print("✅ [RAG_ENHANCEMENT] RAG系统成功增强了prompt")
+            logging.info("✅ [RAG_ENHANCEMENT] RAG系统成功增强了prompt")
         else:
-            print("⚠️ [RAG_ENHANCEMENT] RAG系统未能增强prompt，使用原始prompt")
+            logging.info("⚠️ [RAG_ENHANCEMENT] RAG系统未能增强prompt，使用原始prompt")
 
         # 执行分析
         get_stream_writer()({
@@ -348,9 +349,9 @@ Enhanced Analysis:"""
                 exclude_none=True
             )
         })
-        print(f"🚀 初始提示词长度: {len(final_prompt)} 字符")
-        print(f"🚀 目标路径: {target_path}")
-        print(f"🚀 配置: {config}")
+        logging.info(f"🚀 初始提示词长度: {len(final_prompt)} 字符")
+        logging.info(f"🚀 目标路径: {target_path}")
+        logging.info(f"🚀 配置: {config}")
         final_state = None
         step_count = 0
 
@@ -375,25 +376,25 @@ Enhanced Analysis:"""
                         exclude_none=True
                     )
                 })
-                print(f"\n{'=' * 50}")
-                print(f"🔄 [STEP {step_count}] Current node: {step.get('node_name', 'Unknown')}")
-                print(f"🔄 [STEP {step_count}] Need more info: {step.get('need_more_info', 'Unknown')}")
-                print(f"🔄 [STEP {step_count}] Current path: {step.get('current_working_path', 'Unknown')}")
-                print(f"🔄 [STEP {step_count}] Discovered paths: {len(step.get('discovered_paths', []))}")
+                logging.info(f"\n{'=' * 50}")
+                logging.info(f"🔄 [STEP {step_count}] Current node: {step.get('node_name', 'Unknown')}")
+                logging.info(f"🔄 [STEP {step_count}] Need more info: {step.get('need_more_info', 'Unknown')}")
+                logging.info(f"🔄 [STEP {step_count}] Current path: {step.get('current_working_path', 'Unknown')}")
+                logging.info(f"🔄 [STEP {step_count}] Discovered paths: {len(step.get('discovered_paths', []))}")
 
                 if step.get("messages") and len(step["messages"]) > 0:
-                    print(f"🔄 [STEP {step_count}] Messages count: {len(step['messages'])}")
+                    logging.info(f"🔄 [STEP {step_count}] Messages count: {len(step['messages'])}")
 
                     # 显示所有消息的详细信息
                     for i, msg in enumerate(step["messages"]):
                         msg_preview = msg.content[:150] + "..." if len(msg.content) > 150 else msg.content
-                        print(f"    Message {i + 1} ({msg.type}): {msg_preview}")
+                        logging.info(f"    Message {i + 1} ({msg.type}): {msg_preview}")
 
                     latest_msg = step["messages"][-1]
-                    print(f"🔄 [STEP {step_count}] Latest message type: {latest_msg.type}")
-                    print(f"🔄 [STEP {step_count}] Latest message length: {len(latest_msg.content)} 字符")
+                    logging.info(f"🔄 [STEP {step_count}] Latest message type: {latest_msg.type}")
+                    logging.info(f"🔄 [STEP {step_count}] Latest message length: {len(latest_msg.content)} 字符")
 
-                print(f"{'=' * 50}")
+                logging.info(f"{'=' * 50}")
                 final_state = step
 
             get_stream_writer()({
@@ -401,33 +402,33 @@ Enhanced Analysis:"""
                     exclude_none=True
                 )
             })
-            print(f"\n🎉 Execution completed! Total steps: {step_count}")
+            logging.info(f"\n🎉 Execution completed! Total steps: {step_count}")
 
             # 显示最终状态的详细信息
             if final_state:
-                print("\n" + "=" * 60)
-                print("📋 [FINAL_STATE] 最终状态详情:")
-                print("=" * 60)
-                print(f"📊 最终消息数量: {len(final_state.get('messages', []))}")
-                print(f"📊 信息摘要长度: {len(final_state.get('information_summary', ''))}")
-                print(f"📊 发现的路径: {final_state.get('discovered_paths', [])}")
-                print(f"📊 是否需要更多信息: {final_state.get('need_more_info', 'Unknown')}")
-                print(f"📊 当前工作路径: {final_state.get('current_working_path', 'Unknown')}")
+                logging.info("\n" + "=" * 60)
+                logging.info("📋 [FINAL_STATE] 最终状态详情:")
+                logging.info("=" * 60)
+                logging.info(f"📊 最终消息数量: {len(final_state.get('messages', []))}")
+                logging.info(f"📊 信息摘要长度: {len(final_state.get('information_summary', ''))}")
+                logging.info(f"📊 发现的路径: {final_state.get('discovered_paths', [])}")
+                logging.info(f"📊 是否需要更多信息: {final_state.get('need_more_info', 'Unknown')}")
+                logging.info(f"📊 当前工作路径: {final_state.get('current_working_path', 'Unknown')}")
 
                 # 显示所有最终消息
                 final_messages = final_state.get("messages", [])
                 if final_messages:
-                    print(f"\n--- 最终对话历史 ({len(final_messages)} 条消息) ---")
+                    logging.info(f"\n--- 最终对话历史 ({len(final_messages)} 条消息) ---")
                     for i, msg in enumerate(final_messages):
-                        print(f"\n消息 {i + 1} ({msg.type}):")
-                        print(f"长度: {len(msg.content)} 字符")
-                        print("内容:")
-                        print(msg.content)
-                        print("-" * 40)
+                        logging.info(f"\n消息 {i + 1} ({msg.type}):")
+                        logging.info(f"长度: {len(msg.content)} 字符")
+                        logging.info("内容:")
+                        logging.info(msg.content)
+                        logging.info("-" * 40)
 
-                print("=" * 60)
-                print("📋 [FINAL_STATE] 状态详情结束")
-                print("=" * 60 + "\n")
+                logging.info("=" * 60)
+                logging.info("📋 [FINAL_STATE] 状态详情结束")
+                logging.info("=" * 60 + "\n")
 
             # 处理结果
             if final_state:
@@ -474,7 +475,7 @@ Enhanced Analysis:"""
                         exclude_none=True
                     )
                 })
-                print(f"Analysis results saved to file: {output_file}")
+                logging.info(f"Analysis results saved to file: {output_file}")
 
                 # 生成数据集信息文件
                 dataset_info = extract_dataset_info_from_analysis(final_messages, final_summary)
@@ -491,7 +492,7 @@ Enhanced Analysis:"""
                         exclude_none=True
                     )
                 })
-                print(f"Dataset-specific information saved to file: {dataset_info_file}")
+                logging.info(f"Dataset-specific information saved to file: {dataset_info_file}")
 
                 # 生成Markdown报告
                 markdown_content = f"""# {project_name.title()} Analysis Report
@@ -517,7 +518,7 @@ Historical Context Used: {'Yes' if len(self.analysis_history) > 1 else 'No'}
                         exclude_none=True
                     )
                 })
-                print(f"Concise report saved to file: {markdown_file}")
+                logging.info(f"Concise report saved to file: {markdown_file}")
 
                 # 读取生成的文件内容
                 file_contents = {}
@@ -525,21 +526,21 @@ Historical Context Used: {'Yes' if len(self.analysis_history) > 1 else 'No'}
                     with open(output_file, "r", encoding="utf-8") as f:
                         file_contents["analysis_json"] = json.load(f)
                 except Exception as e:
-                    print(f"Failed to read {output_file}: {e}")
+                    logging.error(f"Failed to read {output_file}: {e}")
                     file_contents["analysis_json"] = None
 
                 try:
                     with open(dataset_info_file, "r", encoding="utf-8") as f:
                         file_contents["dataset_info_json"] = json.load(f)
                 except Exception as e:
-                    print(f"Failed to read {dataset_info_file}: {e}")
+                    logging.error(f"Failed to read {dataset_info_file}: {e}")
                     file_contents["dataset_info_json"] = None
 
                 try:
                     with open(markdown_file, "r", encoding="utf-8") as f:
                         file_contents["markdown_report"] = f.read()
                 except Exception as e:
-                    print(f"Failed to read {markdown_file}: {e}")
+                    logging.error(f"Failed to read {markdown_file}: {e}")
                     file_contents["markdown_report"] = None
 
                 return {
@@ -567,7 +568,7 @@ Historical Context Used: {'Yes' if len(self.analysis_history) > 1 else 'No'}
                     exclude_none=True
                 )
             })
-            print(f"Error during analysis: {e}")
+            logging.error(f"Error during analysis: {e}")
             return {
                 "success": False,
                 "error": str(e),
@@ -605,11 +606,11 @@ Historical Context Used: {'Yes' if len(self.analysis_history) > 1 else 'No'}
                     search_kwargs={"k": 3}
                 ) if self.vectorstore else None
                 self.rag_chain = self._create_rag_chain()
-                print("Analysis history and vector database cleared.")
+                logging.info("Analysis history and vector database cleared.")
             except Exception as e:
-                print(f"Failed to clear vector database: {e}")
+                logging.error(f"Failed to clear vector database: {e}")
         else:
-            print("Analysis history cleared.")
+            logging.info("Analysis history cleared.")
 
     def search_history(self, query, top_k=3):
         """搜索历史记录"""
@@ -628,7 +629,7 @@ Historical Context Used: {'Yes' if len(self.analysis_history) > 1 else 'No'}
             docs = self.vectorstore.similarity_search(query, k=top_k)
             return [{"content": doc.page_content, "metadata": doc.metadata} for doc in docs]
         except Exception as e:
-            print(f"Vector search failed: {e}")
+            logging.error(f"Vector search failed: {e}")
             return []
 
     def get_rag_stats(self):
@@ -729,17 +730,17 @@ def tool_tool_node(state):
                 exclude_none=True
             )
         })
-        print(f"🔧 [TOOL_NODE] 输入消息数量: {len(messages)}")
+        logging.info(f"🔧 [TOOL_NODE] 输入消息数量: {len(messages)}")
         if messages:
-            print(f"🔧 [TOOL_NODE] 最后一条消息类型: {messages[-1].type}")
-            print(f"🔧 [TOOL_NODE] 最后一条消息预览: {messages[-1].content[:150]}...")
+            logging.info(f"🔧 [TOOL_NODE] 最后一条消息类型: {messages[-1].type}")
+            logging.info(f"🔧 [TOOL_NODE] 最后一条消息预览: {messages[-1].content[:150]}...")
 
         result = tool_agent.invoke({"messages": messages}, {"recursion_limit": 200})
 
         # 详细显示工具模型的输出
-        print("\n" + "=" * 60)
-        print("🔧 [TOOL_MODEL_OUTPUT] 工具模型完整输出:")
-        print("=" * 60)
+        logging.info("\n" + "=" * 60)
+        logging.info("🔧 [TOOL_MODEL_OUTPUT] 工具模型完整输出:")
+        logging.info("=" * 60)
 
         if result.get("messages"):
             get_stream_writer()({
@@ -747,7 +748,7 @@ def tool_tool_node(state):
                     exclude_none=True
                 )
             })
-            print(f"📊 返回消息数量: {len(result['messages'])}")
+            logging.info(f"📊 返回消息数量: {len(result['messages'])}")
             for i, msg in enumerate(result["messages"]):
                 if msg.type == "ai" and len(msg.content) > 100:  # 只输出重要的AI回复
                     get_stream_writer()({
@@ -755,23 +756,23 @@ def tool_tool_node(state):
                             exclude_none=True
                         )
                     })
-                print(f"\n--- 消息 {i + 1} ---")
-                print(f"类型: {msg.type}")
-                print(f"内容长度: {len(msg.content)} 字符")
-                print("内容:")
-                print(msg.content)
-                print("-" * 40)
+                logging.info(f"\n--- 消息 {i + 1} ---")
+                logging.info(f"类型: {msg.type}")
+                logging.info(f"内容长度: {len(msg.content)} 字符")
+                logging.info("内容:")
+                logging.info(msg.content)
+                logging.info("-" * 40)
         else:
             get_stream_writer()({
                 "data": AiChatResultVO(text="⚠️ 工具模型没有返回任何消息").model_dump_json(
                     exclude_none=True
                 )
             })
-            print("⚠️ 工具模型没有返回任何消息")
+            logging.info("⚠️ 工具模型没有返回任何消息")
 
-        print("=" * 60)
-        print("🔧 [TOOL_MODEL_OUTPUT] 输出结束")
-        print("=" * 60 + "\n")
+        logging.info("=" * 60)
+        logging.info("🔧 [TOOL_MODEL_OUTPUT] 输出结束")
+        logging.info("=" * 60 + "\n")
 
         # 更新路径状态
         updated_path = current_path
@@ -797,7 +798,7 @@ def tool_tool_node(state):
                                 exclude_none=True
                             )
                         })
-                        print(f"Discovered new path: {path}")
+                        logging.info(f"Discovered new path: {path}")
 
                 # 检测路径错误并提供智能恢复
                 error_patterns = [
@@ -811,7 +812,7 @@ def tool_tool_node(state):
                 readfile_error = False
                 if "no such file or directory" in content.lower() and "readfiletool" in content.lower():
                     readfile_error = True
-                    print("Detected ReadFileTool path error - suggesting FileSearchTool workflow")
+                    logging.info("Detected ReadFileTool path error - suggesting FileSearchTool workflow")
 
                 error_type = None
                 for pattern, err_type in error_patterns:
@@ -849,7 +850,7 @@ def tool_tool_node(state):
 
                 # 如果检测到路径错误，提供智能路径建议
                 elif error_type == "PATH_ERROR":
-                    print(f"Detected {error_type}: {content[:200]}")
+                    logging.info(f"Detected {error_type}: {content[:200]}")
 
                     # 动态构建路径建议
                     suggested_paths = [
@@ -939,7 +940,7 @@ def tool_tool_node(state):
             "target_base_path": target_base_path
         }
     except Exception as e:
-        print(f"Tool node execution error: {e}")
+        logging.error(f"Tool node execution error: {e}")
         error_message = AIMessage(
             content=f"Tool call encountered an error: {str(e)}. Let me try a more systematic approach to explore the codebase.")
 
@@ -1049,9 +1050,9 @@ def reason_node(state):
             exclude_none=True
         )
     })
-    print(f"🧠 [REASON_NODE] 输入提示词长度: {len(system_prompt)} 字符")
-    print(f"🧠 [REASON_NODE] 当前信息摘要长度: {len(current_summary)} 字符")
-    print(f"🧠 [REASON_NODE] 发现的路径数量: {len(discovered_paths)}")
+    logging.info(f"🧠 [REASON_NODE] 输入提示词长度: {len(system_prompt)} 字符")
+    logging.info(f"🧠 [REASON_NODE] 当前信息摘要长度: {len(current_summary)} 字符")
+    logging.info(f"🧠 [REASON_NODE] 发现的路径数量: {len(discovered_paths)}")
 
     # 调用推理模型
     reasoning_result = reason_model.invoke(system_prompt)
@@ -1063,17 +1064,17 @@ def reason_node(state):
             exclude_none=True
         )
     })
-    print("\n" + "=" * 60)
-    print("🧠 [REASONING_MODEL_OUTPUT] 推理模型完整输出:")
-    print("=" * 60)
-    print(f"📊 输出类型: {type(reasoning_result)}")
-    print(f"📊 输出内容长度: {len(reasoning_result.content)} 字符")
-    print("\n--- 推理模型完整分析 ---")
-    print(reasoning_result.content)
-    print("-" * 60)
-    print("=" * 60)
-    print("🧠 [REASONING_MODEL_OUTPUT] 输出结束")
-    print("=" * 60 + "\n")
+    logging.info("\n" + "=" * 60)
+    logging.info("🧠 [REASONING_MODEL_OUTPUT] 推理模型完整输出:")
+    logging.info("=" * 60)
+    logging.info(f"📊 输出类型: {type(reasoning_result)}")
+    logging.info(f"📊 输出内容长度: {len(reasoning_result.content)} 字符")
+    logging.info("\n--- 推理模型完整分析 ---")
+    logging.info(reasoning_result.content)
+    logging.info("-" * 60)
+    logging.info("=" * 60)
+    logging.info("🧠 [REASONING_MODEL_OUTPUT] 输出结束")
+    logging.info("=" * 60 + "\n")
 
     # 解析结果
     analysis = reasoning_result.content
@@ -1092,7 +1093,7 @@ def reason_node(state):
                     exclude_none=True
                 )
             })
-        print(f"Updating working path: {current_path} -> {updated_path}")
+        logging.info(f"Updating working path: {current_path} -> {updated_path}")
 
     # 提取最终分析结果
     if "FINAL_ANSWER:" in analysis:

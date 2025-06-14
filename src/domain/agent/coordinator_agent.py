@@ -2,7 +2,7 @@
 JDSecondCoordinator - 一个基于LangGraph的多智能体系统。
 该系统实现了一个监督者（Coordinator）管理多个专业代理之间的协作。
 """
-
+import logging
 import os
 
 # 标准库导入
@@ -18,9 +18,9 @@ from langgraph.graph import StateGraph, START
 from langgraph.types import Command
 from pydantic import Field, BaseModel
 
-from src.domain.dataset_agent import DatasetAgent
+from src.domain.agent.dataset_agent import DatasetAgent
 from src.domain.model.model import AdapterState, DatasetAgentState
-from src.domain.model_agent import ModelAgent
+from src.domain.agent.model_agent import ModelAgent
 from src.llm.llm_factory import LLMFactory
 from src.llm.model.LLMType import LLMType
 
@@ -126,9 +126,9 @@ class CoordinatorAgent:
             )
             # remaining_agents 追加 state["nextAgents"] 确保顺序，并去重
             remaining_agents = list(set(remaining_agents + state["nextAgents"]))
-            print(f"Coordinator 选择 Agent To {goto}")
+            logging.info(f"Coordinator 选择 Agent To {goto}")
             # 添加判空处理，确保response.answer_type存在并有值
-            print(
+            logging.info(
                 f"[Coordinator] isInit=True, goto: {goto}, state: {{'conversationId': {conversation_id}}}"
             )
             if goto == 'DatasetAgent':
@@ -168,7 +168,7 @@ class CoordinatorAgent:
             if not state["nextAgents"]:
                 writer = get_stream_writer()
                 writer("")
-                print(
+                logging.info(
                     f"[Coordinator] nextAgents 为空，流转到 END，state: {{'conversationId': {conversation_id}}}"
                 )
                 return Command(goto=END)
@@ -177,7 +177,7 @@ class CoordinatorAgent:
             remaining_agents = (
                 state["nextAgents"][1:] if len(state["nextAgents"]) > 1 else []
             )
-            print(
+            logging.info(
                 f"[Coordinator] nextAgents流转，goto: {goto}, remaining_agents: {remaining_agents}, state: {{'conversationId': {conversation_id}}}"
             )
             # 获取当前状态的answer_type，如果不存在则使用默认值

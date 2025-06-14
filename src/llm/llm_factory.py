@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Dict, Type
 import asyncio
 from dotenv import load_dotenv
@@ -215,6 +216,6 @@ if __name__ == "__main__":
     # 异步创建 Qwen 模型实例
     async def main():
         qwen_llm2 = await LLMFactory.async_create_llm(LLMType.QWEN)
-        print("Async LLM created successfully")
+        logging.info("Async LLM created successfully")
 
     asyncio.run(main())

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import sys
 from pathlib import Path
 import json
@@ -7,7 +8,7 @@ from langchain_core.messages import HumanMessage
 from sse_starlette.sse import AsyncContentStream
 
 from src.adapter.vo.ai_chat_model import ChatInputVO, AiChatResultVO
-from src.domain.coordinator_agent import CoordinatorAgent
+from src.domain.agent.coordinator_agent import CoordinatorAgent
 from src.utils.SnowFlake import Snowflake
 
 
@@ -66,18 +67,18 @@ async def chat_handler(request: ChatInputVO) -> AsyncContentStream:
                             if isinstance(data_dict, dict) and "text" in data_dict:
                                 ai_response_text += data_dict["text"]
                         except json.JSONDecodeError:
-                            print("Error decoding JSON data:", chunk["data"])
+                            logging.error("Error decoding JSON data:", chunk["data"])
 
                     # 优化：根据不同的stream_mode处理不同类型的数据
                     yield chunk
-                print(ai_response_text)
+                logging.info(ai_response_text)
             except asyncio.TimeoutError:
-                print("timeout")
+                logging.error("timeout")
         except Exception as e:
-            print(e)
+            logging.error(e)
 
     except Exception as e:
-        print(e)
+        logging.error(e)
     finally:
         # 添加完成消息到队列
         result = AiChatResultVO(text="")

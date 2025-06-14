@@ -1,5 +1,5 @@
 import os
-from src.domain.dataset_agent import DatasetAgent
+from src.domain.agent.dataset_agent import DatasetAgent
 
 from dotenv import load_dotenv
 load_dotenv('.env')
