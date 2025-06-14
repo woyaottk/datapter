@@ -20,7 +20,7 @@ class LLMFactory:
     # 工厂类映射
     _factory_map: Dict[LLMType, Type] = {
         LLMType.QWEN: OpenAIFactory,
-        LLMType.QWEN_MAX: TongyiFactory,
+        # LLMType.QWEN_MAX: TongyiFactory,
     }
 
     @classmethod

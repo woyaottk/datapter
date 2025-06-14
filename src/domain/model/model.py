@@ -25,6 +25,7 @@ class AdapterState(MessagesState):
     nextAgents: list[str] = []
     messages: list[dict] = []
     context: str
+    dataset_state: DatasetAgentState = None
 
 
 async def command_update(state):

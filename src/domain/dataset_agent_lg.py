@@ -3,6 +3,9 @@ import json
 import shutil
 import asyncio
 from typing import List, Optional, Dict, Any
+from langgraph.types import Command
+from src.domain.constant.constant import AgentTypeEnum
+from src.domain.model.model import command_update
 
 # --- LangChain/LangGraph 核心库导入 ---
 from langchain.output_parsers import PydanticOutputParser
@@ -102,7 +105,7 @@ class DatapterAgent:
 
         pass
 
-    async def __call__(self, state: DatasetAgentState) -> Dict[str, Any]:
+    async def __call__(self, state: DatasetAgentState) -> Command:
         """
         LangGraph框架调用的主入口点。
         以批处理模式执行完整的分析流程，并返回一个包含最终输出字段的字典。
@@ -125,12 +128,13 @@ class DatapterAgent:
 
             # --- 成功返回，填充状态字典 ---
             print("[DatapterAgent] 运行成功, 返回最终状态。")
-            return {
-                "input_path": input_path,
-                "output_path": output_dir,
-                "saved_analysis_filename": filename,
-                "enhanced_file_tree_json": json_string,
-            }
+            datasetagentstate = DatasetAgentState(input_path=input_path, output_path=output_dir, saved_analysis_filename=filename, enhanced_file_tree_json=json_string)
+            state['dataset_state'] = datasetagentstate
+            return Command(
+            goto=AgentTypeEnum.Supervisor.value,
+            update=await command_update(state),
+        )
+
 
         except Exception as e:
             error_message = f"执行过程中发生严重错误: {e}"
