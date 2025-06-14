@@ -1,6 +1,6 @@
 import os
-from src.domain.model_agent import ModelAgent
-
+from src.domain.agent.model_agent import ModelAgent
+import src.utils.log_util
 from dotenv import load_dotenv
 load_dotenv('.env')
 
@@ -26,7 +26,7 @@ async def test_model_agent():
         context='',
         model_path=input_path,
         model_analyse=[],
-        model_agent_prompt=[],
+        model_agent_prompt=['None'],
     )
     print(global_state)
 

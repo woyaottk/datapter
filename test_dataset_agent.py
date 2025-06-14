@@ -1,6 +1,6 @@
 import os
 from src.domain.agent.dataset_agent import DatasetAgent
-
+import src.utils.log_util
 from dotenv import load_dotenv
 load_dotenv('.env')
 
@@ -16,7 +16,6 @@ async def test_dataset_agent():
     dataset_state = DatasetAgentState(
         input_path=input_path
     )
-
     global_state = AdapterState(
         conversationId='',
         conversation_id='',
@@ -32,7 +31,6 @@ async def test_dataset_agent():
         model_agent_prompt=[],
         dataset_state=dataset_state
     )
-    print(global_state)
 
     # 2. 初始化 Agent
     datapter_agent = DatasetAgent()
