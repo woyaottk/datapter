@@ -19,7 +19,7 @@ from langgraph.types import Command
 from pydantic import Field, BaseModel
 
 from src.domain.dataset_agent import DatasetAgent
-from src.domain.model.model import AdapterState
+from src.domain.model.model import AdapterState, DatasetAgentState
 from src.domain.model_agent import ModelAgent
 from src.llm.llm_factory import LLMFactory
 from src.llm.model.LLMType import LLMType
@@ -131,15 +131,37 @@ class CoordinatorAgent:
             print(
                 f"[Coordinator] isInit=True, goto: {goto}, state: {{'conversationId': {conversation_id}}}"
             )
-            return Command(
-                goto=goto,
-                update={
-                    "nextAgents": remaining_agents,
-                    "isInit": False,
-                    "context": "空",
-                    "gotoEnd": False,
-                },
-            )
+            if goto == 'DatasetAgent':
+                return Command(
+                    goto=goto,
+                    update={
+                        "nextAgents": remaining_agents,
+                        "isInit": False,
+                        "gotoEnd": False,
+                        "dataset_state": DatasetAgentState(input_path=os.getenv("DATASET.INPUT_DIR", "data/input/dataset")),
+                    },
+                )
+            elif goto == 'ModelAgent':
+                return Command(
+                    goto=goto,
+                    update={
+                        "nextAgents": remaining_agents,
+                        "isInit": False,
+                        "model_agent_prompt": response.prompts,
+                        "gotoEnd": False,
+                        "model_path": os.getenv("CODE.INPUT_DIR", "data/input/code"),
+                    },
+                )
+            else:
+                return Command(
+                    goto=goto,
+                    update={
+                        "nextAgents": remaining_agents,
+                        "isInit": False,
+                        "context": "空",
+                        "gotoEnd": False,
+                    },
+                )
 
         if "nextAgents" in state:
             # 如果state["nextAgents"]=[]，则return END
