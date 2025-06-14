@@ -1,5 +1,5 @@
 import os
-from src.domain.dataset_agent_lg import DatapterAgent
+from src.domain.dataset_agent import DatasetAgent
 
 from dotenv import load_dotenv
 load_dotenv('.env')
@@ -35,7 +35,7 @@ async def test_dataset_agent():
     print(global_state)
 
     # 2. 初始化 Agent
-    datapter_agent = DatapterAgent()
+    datapter_agent = DatasetAgent()
 
     # 3. 调用 Agent 并获取结果
     result = await datapter_agent(global_state)

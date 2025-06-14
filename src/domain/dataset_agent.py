@@ -1,79 +1,66 @@
-import os
+import asyncio
 import json
+import os
 import shutil
-from typing import List, Optional, Dict, Any, TypedDict, Annotated
-import operator
+from typing import List, Optional, Dict, Any
 
-# --- LangChain/LangGraph 库导入 ---
+# --- LangChain/LangGraph 核心库导入 ---
 from langchain.output_parsers import PydanticOutputParser
-from pydantic import BaseModel, Field
-from langgraph.graph import StateGraph, END
-from langchain_core.messages import BaseMessage
 from langchain_core.language_models import BaseLanguageModel
+from langgraph.types import Command
+from pydantic import BaseModel, Field
 
-# --- 自定义工具导入 ---
-from src.tools.FileTreeAnalysisTool import analyze_file_tree
-from src.tools.ArchiveDecompressionTool import decompress_and_create_replica
+from src.domain.constant.constant import AgentTypeEnum
+# --- 项目内部模块导入 ---
+# Agent的状态定义从外部模型文件导入
+from src.domain.model.model import DatasetAgentState
+from src.domain.model.model import command_update, AdapterState
 from src.llm.llm_factory import LLMFactory
 from src.llm.model.LLMType import LLMType
-from model.model import DatasetAgentState
-
-# === 配置管理 ===
-def load_config():
-    """从环境变量加载配置。"""
-    from dotenv import load_dotenv
-    load_dotenv(r'..\..\.env')
-    # 默认值
-    config_data = {
-        "max_files_to_list": int(os.getenv("DATASET.MAX_FILES_PER_TYPE_TO_LIST", 10)),
-        "output_dir": os.getenv("DATASET.OUTPUT_DIR"),
-    }
-    return config_data
+from src.tools.ArchiveDecompressionTool import decompress_and_create_replica
+from src.tools.FileTreeAnalysisTool import analyze_file_tree
 
 
-# === Pydantic 模型  ===
+# === 1. Pydantic 数据结构定义 (Agent内部使用) ===
+
 class EnhancedFileNode(BaseModel):
-    name: str = Field(description="文件或目录的名称。必须保留输入中的原始值。")
-    type: str = Field(
-        description="节点类型：'file' (文件)、'directory' (目录) 或 'summary' (省略摘要)。必须保留输入中的原始值。")
-    size: Optional[int] = Field(default=None,
-                                description="文件大小（字节，仅适用于文件）。如果输入中存在，则必须保留原始值。")
-    children: Optional[List["EnhancedFileNode"]] = Field(default=None,
-                                                         description="子节点列表（仅适用于目录）。必须保留输入中的原始结构和内容。")
-    description: Optional[str] = Field(default=None, description="节点描述或省略摘要描述。")
-    count: Optional[int] = Field(default=None, description="省略表示的文件总数（仅适用于summary类型）。")
-    extension: Optional[str] = Field(default=None, description="省略表示的文件扩展名（仅适用于summary类型）。")
-    format: Optional[str] = Field(default=None,
-                                  description="文件格式/扩展名 (例如, 'jpg', 'parquet', 'txt')。对于目录和summary，此值为 null。")
-    is_data_container: Optional[bool] = Field(default=None,
-                                              description="布尔值，表示此节点是否主要存储数据集的核心数据。如果未知，则使用 null。")
-    purpose_tag: Optional[str] = Field(default=None,
-                                       description="主要用途标签：'training_data', 'validation_data', 'test_data', 'annotations', 'documentation', 'scripts', 'auxiliary', 'unknown'。如不适用，则使用 null。")
-    data_type_suggestion: Optional[str] = Field(default=None,
-                                                description="建议的数据类型：'images', 'text_corpus', 'tabular_data', 'audio', 'video', 'mixed', 'unknown'。如不适用，则使用 null。")
-    relevance_group_id: Optional[str] = Field(default=None,
-                                              description="功能相关节点组的标识符。如果节点不属于任何组或未知，则使用 null。")
+    name: str = Field(description="文件或目录的名称。")
+    type: str = Field(description="节点类型：'file', 'directory', 或 'summary'。")
+    size: Optional[int] = Field(default=None, description="文件大小（字节）。")
+    children: Optional[List["EnhancedFileNode"]] = Field(default=None, description="子节点列表。")
+    description: Optional[str] = Field(default=None, description="节点描述。")
+    count: Optional[int] = Field(default=None, description="省略表示的文件总数。")
+    extension: Optional[str] = Field(default=None, description="省略表示的文件扩展名。")
+    format: Optional[str] = Field(default=None, description="文件格式/扩展名。")
+    is_data_container: Optional[bool] = Field(default=None, description="是否为核心数据容器。")
+    purpose_tag: Optional[str] = Field(default=None, description="主要用途标签。")
+    data_type_suggestion: Optional[str] = Field(default=None, description="建议的数据类型。")
+    relevance_group_id: Optional[str] = Field(default=None, description="功能相关节点组的标识符。")
 
 
 class EnhancedFileTree(BaseModel):
-    root: EnhancedFileNode = Field(
-        description="增强文件树的根节点。此根节点及其子节点的结构必须与输入文件树结构完全匹配。")
+    root: EnhancedFileNode = Field(description="增强文件树的根节点。")
 
 
-# === 工作流状态定义  ===
-class DatasetAnalysisState(TypedDict):
-    input_path: str
-    run_output_dir: str
-    processed_replica_dir: str
-    raw_file_tree: Optional[Dict[str, Any]]
-    enhanced_file_tree: Optional[Dict[str, Any]]
-    error: Optional[str]
-    messages: Annotated[List[BaseMessage], operator.add]
-    analysis_metadata: Optional[Dict[str, Any]]
+# === 2. 辅助函数与配置 ===
+
+def load_config():
+    """从环境变量加载配置。"""
+    from dotenv import load_dotenv
+    try:
+        # 确保.env文件路径相对于您运行脚本的位置是正确的
+        load_dotenv(r'..\..\.env')
+    except Exception:
+        print("Warning: .env file not found. Using default environment variables.")
+
+    return {
+        "max_files_to_list": int(os.getenv("DATASET.MAX_FILES_PER_TYPE_TO_LIST", 10)),
+        "output_dir": os.getenv("DATASET.OUTPUT_DIR", "output"),
+    }
 
 
-# === 辅助函数 ===
 def _extract_summary_statistics(file_tree: Dict[str, Any]) -> Dict[str, Any]:
+    """遍历文件树，提取关于省略节点的统计信息。"""
     stats = {"total_summary_nodes": 0, "total_omitted_files": 0, "summary_by_extension": {}}
 
     def _traverse(node):
@@ -93,16 +80,21 @@ def _extract_summary_statistics(file_tree: Dict[str, Any]) -> Dict[str, Any]:
     return stats
 
 
-def _build_enhancement_prompt(file_tree: Dict[str, Any], metadata: Dict[str, Any], format_instructions: str) -> str:
-    summary_stats = metadata.get("summary_statistics", {})
+def _build_enhancement_prompt(file_tree: Dict[str, Any], summary_stats: Dict[str, Any],
+                              format_instructions: str) -> str:
+    """构建用于AI增强的提示，包含文件省略统计的关键上下文。"""
+    summary_line = (
+        f"**重要提示：此文件树使用了'省略表示'功能**\n"
+        f"- 当文件夹中有大量同类型文件时，只显示前几个文件，其余用 `type: \"summary\"` 的节点表示。\n"
+        f"- 本次分析发现了 {summary_stats.get('total_summary_nodes', 0)} 个省略节点，共省略了 {summary_stats.get('total_omitted_files', 0)} 个文件。"
+    )
+
     return f"""你是一个数据集文件结构分析智能体。你的任务是分析输入的JSON格式文件树，并返回一个结构完全相同但语义增强的文件树。
-**重要提示：此文件树使用了"省略表示"功能**
-- 当文件夹中有大量同类型文件时，只显示前几个文件，其余用 `type: "summary"` 的节点表示。
-- 本次分析发现了 {summary_stats.get('total_summary_nodes', 0)} 个省略节点，共省略了 {summary_stats.get('total_omitted_files', 0)} 个文件。
+{summary_line}
 **关键指令:**
 1. **保持原始结构**: 绝对不能修改 `name`, `type`, `size`, `children`, `count`, `extension` 等原始字段。
 2. **理解省略表示**: 基于 `count` 和 `extension` 推断这些文件的用途和重要性。
-3. **全面语义标注**: 为每个节点（包括file, directory, summary）添加 `description`, `format`, `is_data_container`, `purpose_tag`, `data_type_suggestion`, `relevance_group_id` 字段。
+3. **全面语义标注**: 为每个节点添加 `description`, `format`, `is_data_container`, `purpose_tag`, `data_type_suggestion`, `relevance_group_id` 字段。
 **输出格式:**
 {format_instructions}
 **输入文件树:**
@@ -110,170 +102,115 @@ def _build_enhancement_prompt(file_tree: Dict[str, Any], metadata: Dict[str, Any
 请基于以上信息，返回增强后的文件树JSON。"""
 
 
-# === 主要智能体类 ===
-class DatapterAgent:
-    def __init__(self, llm: BaseLanguageModel, config: Dict[str, Any]):
+# === 3. 主要智能体类 ===
+
+class DatasetAgent:
+    def __init__(self):
+        """初始化智能体。"""
+
+        pass
+
+    async def __call__(self, global_state: AdapterState) -> Command:
         """
-        初始化智能体，接收所需的LLM和配置。
+        LangGraph框架调用的主入口点。
+        以批处理模式执行完整的分析流程，并返回一个包含最终输出字段的字典。
         """
-        self.llm = llm
-        self.config = config
-        self.workflow = self._create_workflow()
-        print("Datapter Agent 初始化完成")
-
-    # --- 节点函数现在是类的内部方法 ---
-    def _setup_and_decompress_node(self, state: DatasetAnalysisState) -> DatasetAnalysisState:
-        """阶段 0: 创建统一的输出目录并解压输入文件。"""
-        print("\n=== 阶段零：创建输出目录并解压缩 开始 ===")
-        input_path = state["input_path"]
+        state = None
         try:
-            base_name = os.path.basename(input_path.rstrip("/\\")).split(".")[0]
-            base_output_dir = self.config["output_dir"]
-            run_output_dir = os.path.join(base_output_dir, base_name)
+            # --- 初始化 ---
+            config = load_config()
+            llm = LLMFactory.create_llm(LLMType.QWEN)
+            state = global_state.get("dataset_state")
+            input_path = state.get("input_path")
+            if not input_path or not await asyncio.to_thread(os.path.exists, input_path):
+                raise ValueError(f"输入路径无效或不存在: {input_path}")
 
-            if os.path.exists(run_output_dir):
-                shutil.rmtree(run_output_dir)
-            os.makedirs(run_output_dir, exist_ok=True)
-            state["run_output_dir"] = run_output_dir
-            print(f"所有输出将保存在统一目录: {run_output_dir}")
+            # --- 依次执行各个阶段，通过局部变量传递数据 ---
+            output_dir, processed_dir = await self._run_stage_0(input_path, config, decompress_and_create_replica)
+            raw_file_tree = await self._run_stage_1(processed_dir, output_dir, config, analyze_file_tree)
+            enhanced_tree_dict = await self._run_stage_2(raw_file_tree, llm)
+            filename, json_string = await self._run_stage_3(enhanced_tree_dict, output_dir)
 
-            processed_path = decompress_and_create_replica(
-                source_path=input_path, target_dir=run_output_dir
+            # --- 成功返回，填充状态字典 ---
+            print("[DatapterAgent] 运行成功, 返回最终状态。")
+            state['output_path'] = output_dir
+            state['saved_analysis_filename'] = filename
+            state['enhanced_file_tree_json'] = json_string
+            global_state['dataset_state'] = state
+            return Command(
+                goto=AgentTypeEnum.Supervisor.value,
+                update=await command_update(global_state),
             )
-            state["processed_replica_dir"] = processed_path
-            print(f"阶段零：输入路径处理完成。处理后的副本路径: {processed_path}")
         except Exception as e:
-            error_msg = f"在设置或解压阶段发生错误: {e}"
-            state["error"] = error_msg
-            print(f"阶段零：失败 - {error_msg}")
-        print("=== 阶段零：创建输出目录并解压缩 结束 ===")
-        return state
-
-    def _analyze_file_tree_node(self, state: DatasetAnalysisState) -> DatasetAnalysisState:
-        """阶段 1: 分析文件树结构。"""
-        print("\n=== 阶段一：文件树结构分析 开始 ===")
-        if state.get("error"):
-            print(f"由于先前错误，跳过文件树分析: {state['error']}")
-            return state
-        try:
-            result = analyze_file_tree(
-                dataset_root_dir=state["processed_replica_dir"],
-                output_dir=state["run_output_dir"],
-                max_files_to_list=self.config["max_files_to_list"],
+            error_message = f"执行过程中发生严重错误: {e}"
+            print(f"[DatapterAgent] {error_message}")
+            if not state:
+                state = DatasetAgentState()
+            state['error_msg'] = error_message
+            global_state['dataset_state'] = state
+            return Command(
+                goto=AgentTypeEnum.Supervisor.value,
+                update=await command_update(global_state),
             )
-            if "error" not in result:
-                state["raw_file_tree"] = result
-                print("阶段一：文件树结构分析成功。")
-            else:
-                state["error"] = f"文件树分析失败: {result['error']}"
-                print(f"阶段一：分析失败 - {state['error']}")
-        except Exception as e:
-            state["error"] = f"文件树分析时发生意外错误: {e}"
-            print(f"阶段一：分析失败 - {state['error']}")
-        print("=== 阶段一：文件树结构分析 结束 ===")
-        return state
 
-    def _enhance_file_tree_node(self, state: DatasetAnalysisState) -> DatasetAnalysisState:
-        """阶段 2: 使用LLM对文件树进行语义增强。"""
-        print("\n=== 阶段二：文件树语义增强 开始 ===")
-        if state.get("error") or not state.get("raw_file_tree"):
-            print("由于错误或缺少原始文件树，跳过增强阶段。")
-            return state
-        try:
-            parser = PydanticOutputParser(pydantic_object=EnhancedFileTree)
-            format_instructions = parser.get_format_instructions()
-            summary_stats = _extract_summary_statistics(state["raw_file_tree"])
-            state["analysis_metadata"] = {"summary_statistics": summary_stats}
-            prompt = _build_enhancement_prompt(state["raw_file_tree"], state["analysis_metadata"], format_instructions)
+    async def _run_stage_0(self, input_path: str, config: dict, decompress_func) -> (str, str):
+        print("--- 阶段0: 设置与解压 ---")
+        base_name = os.path.basename(input_path.rstrip("/\\")).split(".")[0]
+        run_output_dir = os.path.join(config["output_dir"], base_name)
 
-            # 使用类实例中的LLM
-            response_message = self.llm.invoke(prompt)
+        if await asyncio.to_thread(os.path.exists, run_output_dir):
+            await asyncio.to_thread(shutil.rmtree, run_output_dir)
+        await asyncio.to_thread(os.makedirs, run_output_dir, exist_ok=True)
 
-            enhanced_tree_obj = parser.parse(response_message.content)
-            state["enhanced_file_tree"] = enhanced_tree_obj.model_dump()
-            print("阶段二：文件树语义增强成功。")
-        except Exception as e:
-            state["error"] = f"文件树增强过程失败: {e}"
-            print(f"阶段二：失败 - {state['error']}")
-        print("=== 阶段二：文件树语义增强 结束 ===")
-        return state
+        processed_path = await asyncio.to_thread(
+            decompress_func,
+            source_path=input_path, target_dir=run_output_dir
+        )
+        return run_output_dir, processed_path
 
-    def _save_results_node(self, state: DatasetAnalysisState) -> DatasetAnalysisState:
-        """阶段 3: 保存最终的增强文件树。"""
-        print("\n=== 阶段三：保存最终分析结果 开始 ===")
-        if state.get("enhanced_file_tree") and not state.get("error"):
-            try:
-                output_file_path = os.path.join(state["run_output_dir"], "enhanced_analysis_results.json")
-                with open(output_file_path, "w", encoding="utf-8") as f:
-                    json.dump(state["enhanced_file_tree"], f, ensure_ascii=False, indent=2)
-                print(f"阶段三：最终增强结果已保存至: {output_file_path}")
-            except Exception as e:
-                state["error"] = f"保存最终结果失败: {e}"
-                print(f"阶段三：失败 - {state['error']}")
-        else:
-            print("由于错误或无有效数据，跳过保存最终结果。")
-        print("=== 阶段三：保存最终分析结果 结束 ===")
-        return state
+    async def _run_stage_1(self, processed_dir: str, output_dir: str, config: dict, analyze_func) -> Dict[str, Any]:
+        print("--- 阶段1: 分析文件树 ---")
+        result = await asyncio.to_thread(
+            analyze_func,
+            dataset_root_dir=processed_dir,
+            output_dir=output_dir,
+            max_files_to_list=config["max_files_to_list"],
+        )
 
-    def _create_workflow(self):
-        """构建LangGraph工作流，将节点方法连接起来。"""
-        workflow = StateGraph(DatasetAnalysisState)
-        workflow.add_node("setup_and_decompress", self._setup_and_decompress_node)
-        workflow.add_node("analyze_file_tree", self._analyze_file_tree_node)
-        workflow.add_node("enhance_file_tree", self._enhance_file_tree_node)
-        workflow.add_node("save_results", self._save_results_node)
+        if "error" in result:
+            raise RuntimeError(f"文件树分析失败: {result.get('error')}")
 
-        workflow.set_entry_point("setup_and_decompress")
-        workflow.add_edge("setup_and_decompress", "analyze_file_tree")
-        workflow.add_edge("analyze_file_tree", "enhance_file_tree")
-        workflow.add_edge("enhance_file_tree", "save_results")
-        workflow.add_edge("save_results", END)
-
-        return workflow.compile()
-
-    def analyze_dataset(self, input_path: str) -> Dict[str, Any]:
-        """用于运行数据集分析工作流的公开方法。"""
-        print(f"\n开始分析数据集: {input_path}")
-        if not os.path.exists(input_path):
-            return {"error": f"输入路径不存在: {input_path}"}
-
-        initial_state = {"input_path": input_path, "messages": []}
-        final_state = self.workflow.invoke(initial_state)
-
-        result = {
-            "success": not bool(final_state.get("error")),
-            "run_output_dir": final_state.get("run_output_dir"),
-            "enhanced_file_tree": final_state.get("enhanced_file_tree"),
-            "error": final_state.get("error"),
-        }
-
-        if result["success"]:
-            print(f"\n✅ 数据集分析成功完成！所有结果保存在: {result['run_output_dir']}")
-        else:
-            print(f"\n❌ 数据集分析失败: {result['error']}")
         return result
 
+    async def _run_stage_2(self, raw_file_tree: dict, llm: BaseLanguageModel) -> Dict[str, Any]:
+        print("--- 阶段2: AI语义增强 ---")
+        summary_stats = _extract_summary_statistics(raw_file_tree)
+        print(
+            f"检测到 {summary_stats['total_summary_nodes']} 个省略节点，共 {summary_stats['total_omitted_files']} 个文件。")
 
-# === 主执行入口 ===
-def main():
-    # --- 加载配置并初始化LLM ---
-    config = load_config()
-    llm = LLMFactory.create_llm(LLMType.QWEN)
-    print("=" * 60)
-    print("Datapter (DA) 智能体 - 数据集结构分析与描述生成")
-    print("=" * 60)
+        parser = PydanticOutputParser(pydantic_object=EnhancedFileTree)
+        format_instructions = parser.get_format_instructions()
 
-    # --- 实例化智能体并传入依赖，然后运行 ---
-    agent = DatapterAgent(llm=llm, config=config)
-    default_input = os.getenv("DATASET.INPUT_DIR")
+        # 将统计信息传入prompt构建函数
+        prompt = _build_enhancement_prompt(raw_file_tree, summary_stats, format_instructions)
 
-    if not default_input:
-        print("错误: 请在 .env 文件中设置 'DATASET.INPUT_DIR' 环境变量。")
-        return
+        response_message = await llm.ainvoke(prompt)
+        enhanced_tree_obj = parser.parse(response_message.content)
 
-    # 执行分析
-    result = agent.analyze_dataset(default_input)
+        return enhanced_tree_obj.model_dump()
 
+    async def _run_stage_3(self, enhanced_tree_dict: dict, output_dir: str) -> (str, str):
+        print("--- 阶段3: 保存并完成 ---")
+        filename = "enhanced_analysis.json"
+        output_file_path = os.path.join(output_dir, filename)
 
-if __name__ == "__main__":
-    main()
+        def _save_json():
+            with open(output_file_path, "w", encoding="utf-8") as f:
+                json.dump(enhanced_tree_dict, f, ensure_ascii=False, indent=2)
+
+        await asyncio.to_thread(_save_json)
+
+        json_string = json.dumps(enhanced_tree_dict, ensure_ascii=False, indent=2)
+
+        print(f"最终结果已保存至: {output_file_path}")
+        return filename, json_string
