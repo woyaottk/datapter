@@ -7,7 +7,6 @@ from langgraph.types import Command
 from src.adapter.vo.ai_chat_model import AiChatResultVO
 from src.domain.constant.constant import AgentTypeEnum
 from src.domain.model.model import AdapterState, command_update
-from src.utils.llm_util import async_create_llm
 
 import datetime
 import json
@@ -32,7 +31,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import PromptTemplate
 from src.llm import LLMFactory, LLMType
 from src.utils.embedding_util import EmbeddingUtil
-writer = get_stream_writer()
 
 # 定义状态类
 class CollaborativeAgentState(MessagesState):
@@ -115,7 +113,7 @@ def tool_tool_node(state):
             enhanced_message = HumanMessage(content=path_context_msg)
             messages = messages[:-1] + [enhanced_message]
         
-        writer({
+        get_stream_writer()({
             "data": AiChatResultVO(text="🔧 开始调用工具模型进行代码分析...").model_dump_json(
                 exclude_none=True
             )
@@ -133,7 +131,7 @@ def tool_tool_node(state):
         print("="*60)
         
         if result.get("messages"):
-            writer({
+            get_stream_writer()({
                 "data": AiChatResultVO(text=f"📊 工具模型返回了 {len(result['messages'])} 条消息").model_dump_json(
                     exclude_none=True
                 )
@@ -141,7 +139,7 @@ def tool_tool_node(state):
             print(f"📊 返回消息数量: {len(result['messages'])}")
             for i, msg in enumerate(result["messages"]):
                 if msg.type == "ai" and len(msg.content) > 100:  # 只输出重要的AI回复
-                    writer({
+                    get_stream_writer()({
                         "data": AiChatResultVO(text=f"🔧 工具分析结果 {i+1}: {msg.content[:200]}...").model_dump_json(
                             exclude_none=True
                         )
@@ -153,7 +151,7 @@ def tool_tool_node(state):
                 print(msg.content)
                 print("-" * 40)
         else:
-            writer({
+            get_stream_writer()({
                 "data": AiChatResultVO(text="⚠️ 工具模型没有返回任何消息").model_dump_json(
                     exclude_none=True
                 )
@@ -183,7 +181,7 @@ def tool_tool_node(state):
                 for path in successful_paths:
                     if path not in updated_discovered:
                         updated_discovered.append(path)
-                        writer({
+                        get_stream_writer()({
                             "data": AiChatResultVO(text=f"🔍 发现新路径: {path}").model_dump_json(
                                 exclude_none=True
                             )
@@ -433,7 +431,7 @@ def reason_node(state):
     Be DECISIVE and SPECIFIC. Use full paths in instructions based on the project structure.
     """
     
-    writer({
+    get_stream_writer()({
         "data": AiChatResultVO(text="🧠 开始推理分析，整理代码分析结果...").model_dump_json(
             exclude_none=True
         )
@@ -446,7 +444,7 @@ def reason_node(state):
     reasoning_result = reason_model.invoke(system_prompt)
     
     # 详细显示推理模型的输出
-    writer({
+    get_stream_writer()({
         "data": AiChatResultVO(text=f"🧠 推理模型分析完成，生成了 {len(reasoning_result.content)} 字符的分析结果").model_dump_json(
             exclude_none=True
         )
@@ -475,7 +473,7 @@ def reason_node(state):
         path_suggestion = analysis.split("PATH_UPDATE:")[1].split("INSTRUCTIONS:")[0].split("FINAL_ANSWER:")[0].strip()
         if path_suggestion and path_suggestion != "None" and path_suggestion != "":
             updated_path = path_suggestion
-            writer({
+            get_stream_writer()({
             "data": AiChatResultVO(text=f"📁 更新工作路径: {current_path} -> {updated_path}").model_dump_json(
                 exclude_none=True
             )
@@ -1289,7 +1287,7 @@ Enhanced Analysis:"""
             print("⚠️ [RAG_ENHANCEMENT] RAG系统未能增强prompt，使用原始prompt")
         
         # 执行分析
-        writer({
+        get_stream_writer()({
             "data": AiChatResultVO(text=f"🚀 启动协作代理系统分析路径: {target_path}").model_dump_json(
                 exclude_none=True
             )
@@ -1315,7 +1313,7 @@ Enhanced Analysis:"""
                 stream_mode="values",
             ):
                 step_count += 1
-                writer({
+                get_stream_writer()({
                     "data": AiChatResultVO(text=f"🔄 步骤 {step_count}: 分析进行中... (发现 {len(step.get('discovered_paths', []))} 个路径)").model_dump_json(
                         exclude_none=True
                     )
@@ -1341,7 +1339,7 @@ Enhanced Analysis:"""
                 print(f"{'='*50}")
                 final_state = step
             
-            writer({
+            get_stream_writer()({
                 "data": AiChatResultVO(text=f"🎉 分析完成! 总共执行了 {step_count} 个步骤").model_dump_json(
                     exclude_none=True
                 )
@@ -1414,7 +1412,7 @@ Enhanced Analysis:"""
                 with open(output_file, "w", encoding="utf-8") as f:
                     json.dump(output_data, f, ensure_ascii=False, indent=2)
                 
-                writer({
+                get_stream_writer()({
                     "data": AiChatResultVO(text=f"📁 分析结果已保存到文件: {output_file}").model_dump_json(
                         exclude_none=True
                     )
@@ -1431,7 +1429,7 @@ Enhanced Analysis:"""
                 with open(dataset_info_file, "w", encoding="utf-8") as f:
                     json.dump(dataset_info, f, ensure_ascii=False, indent=2)
                 
-                writer({
+                get_stream_writer()({
                     "data": AiChatResultVO(text=f"📊 数据集信息已保存到文件: {dataset_info_file}").model_dump_json(
                         exclude_none=True
                     )
@@ -1457,7 +1455,7 @@ Historical Context Used: {'Yes' if len(self.analysis_history) > 1 else 'No'}
                 with open(markdown_file, "w", encoding="utf-8") as f:
                     f.write(markdown_content)
                 
-                writer({
+                get_stream_writer()({
                     "data": AiChatResultVO(text=f"📝 简洁报告已保存到文件: {markdown_file}").model_dump_json(
                         exclude_none=True
                     )
@@ -1507,7 +1505,7 @@ Historical Context Used: {'Yes' if len(self.analysis_history) > 1 else 'No'}
                 }
                 
         except Exception as e:
-            writer({
+            get_stream_writer()({
                 "data": AiChatResultVO(text=f"❌ 分析过程中发生错误: {str(e)}").model_dump_json(
                     exclude_none=True
                 )
@@ -1603,8 +1601,7 @@ Historical Context Used: {'Yes' if len(self.analysis_history) > 1 else 'No'}
 
 class ModelAgent:
     def __init__(self):
-
-        self.agent = CodeAnalysisAgent(chat_model=LLMFactory.async_create_llm(LLMType.DEEPSEEK_CHAT),reason_model=LLMFactory.async_create_llm(LLMType.DEEPSEEK_REASON),embedding_model=EmbeddingUtil())
+        self.agent = CodeAnalysisAgent(chat_model=LLMFactory.create_llm(LLMType.DEEPSEEK_CHAT),reason_model=LLMFactory.create_llm(LLMType.DEEPSEEK_REASON),embedding_model=EmbeddingUtil())
 
     async def __call__(self, state: AdapterState) -> Command:
         path = state['model_path']
@@ -1619,13 +1616,13 @@ class ModelAgent:
         if output!=None:
             state['model_analyse'].append({'markdown':output['markdown'],"json_out":output['json_out'],
                     "summary":output['summary']})
-            writer({
+            get_stream_writer()({
                 "data": AiChatResultVO(text="✅resolve model successful").model_dump_json(
                             exclude_none=True
                         )
             })
         else:
-            writer({
+            get_stream_writer()({
                         "data": AiChatResultVO(text="Can't resolve model").model_dump_json(
                             exclude_none=True
                         )
