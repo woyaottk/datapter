@@ -53,7 +53,7 @@ def load_config():
     from dotenv import load_dotenv
     try:
         # 确保.env文件路径相对于您运行脚本的位置是正确的
-        load_dotenv(r'../../../.env')
+        load_dotenv(r'D:/Code/datapter/.env')
     except Exception:
         print("Warning: .env file not found. Using default environment variables.")
 
