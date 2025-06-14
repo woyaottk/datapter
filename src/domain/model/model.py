@@ -41,6 +41,7 @@ class AdapterState(MessagesState):
     model_analyse:list[dict] = []
     model_agent_prompt:list = []
     dataset_state: DatasetAgentState = None
+    file_operations: List[str]
 
 
 async def command_update(state):
