@@ -27,21 +27,29 @@ class AdapterState(MessagesState):
     Attributes:
         next: 跟踪下一个应该执行的节点
     """
-
+    # global（整个会话共享）
     conversationId: str
     conversation_id: str
     message_id: str
     blockId: str
     messageId: str
     isInit: bool = True
-    nextAgents: list[str] = []
-    messages: list[dict] = []
-    context: str
-    model_path:str
-    model_analyse:list[dict] = []
-    model_agent_prompt:list = []
+    nextAgents: list[str] = []  # 剩余 agent
+    nextPrompts: list[str] = [] # 剩余 prompt
+    messages: list[dict] = []   # 历史消息
+    # agent（单次agent调用）
+    prompt: str                 # 传递给当前agent的prompt
+    context: str                # 其他必要的上下文信息
+    # model 相关
+    model_path:str              # 模型代码输入路径
+    model_analyse:list[dict] = []   #  模型分析结果
+    model_agent_prompt:list = []    # todo: use prompt instead of model_agent_prompt
+    # dataset 相关
+    dataset_path:str            # 数据集输入路径
+    dataset_analyse:str         # json 格式
     dataset_state: DatasetAgentState = None
-    file_operations: List[str]
+    # adapter 相关
+    file_operations: List[str]  # 文件操作结果
 
 
 async def command_update(state):

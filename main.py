@@ -6,11 +6,18 @@ import signal
 import sys
 from pathlib import Path
 from typing import Set
+from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
+from src.utils.router_manager import ProtocolType, RouterManager
+
+# 加载 .env 文件
+dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
+load_dotenv(dotenv_path)
 
 # 配置带颜色的日志输出
 handler = colorlog.StreamHandler()
 formatter = colorlog.ColoredFormatter(
-    "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
     log_colors={
         'DEBUG': 'cyan',
         'INFO': 'green',
@@ -21,19 +28,15 @@ formatter = colorlog.ColoredFormatter(
 )
 handler.setFormatter(formatter)
 
+DEBUG = os.getenv("DEBUG", "false").lower()
+
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG if DEBUG == "true" else logging.INFO,
     handlers=[handler]
 )
 
-from dotenv import load_dotenv
-from fastapi.middleware.cors import CORSMiddleware
-from src.utils.router_manager import ProtocolType, RouterManager
-
-# 加载 .env 文件
-dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
-load_dotenv(dotenv_path)
 TEST_VAR = os.getenv("TEST_VAR")
+logging.info(f"DEBUG: {DEBUG}")
 logging.info(f"TEST_VAR: {TEST_VAR}")
 # 添加项目根目录到 Python 路径
 project_root = str(Path(__file__).parent.parent.parent)
