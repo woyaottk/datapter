@@ -41,7 +41,8 @@ class AdapterState(MessagesState):
     prompt: str                 # 传递给当前agent的prompt
     context: str                # 其他必要的上下文信息
     # model 相关
-    model_path:str              # 模型代码输入路径
+    model_path:str = 'data/fairseq-main'              # 模型代码输入路径
+    model_analyse_path:str = 'data/output/code/'
     model_analyse:list[dict] = []   #  模型分析结果
     model_agent_prompt:list = []    # todo: use prompt instead of model_agent_prompt
     # dataset 相关
