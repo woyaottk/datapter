@@ -18,6 +18,7 @@ class ModelAgent:
     async def __call__(self, state: AdapterState) -> Command:
         try:
             path = state['model_path']
+            out_path = state['model_analyse_path']
         except KeyError:
             get_stream_writer()({
                 "data": AiChatResultVO(text="❌ No model path provided").model_dump_json(
@@ -32,14 +33,17 @@ class ModelAgent:
         prompt = state['model_agent_prompt'][-1]
         output = None
         for i in range(5):
-            output = self.agent.action(path, prompt)
+            output = self.agent.action(path, prompt,out_path)
             if output['success']:
                 break
             else:
                 pass
-        if output['success']:
+
+        if output is not None and output['success']:
+
             state['model_analyse'].append({'markdown':output['markdown'],"json_out":output['json_out'],
                     "summary":output['summary']})
+
             get_stream_writer()({
                 "data": AiChatResultVO(text="✅resolve model successful").model_dump_json(
                             exclude_none=True

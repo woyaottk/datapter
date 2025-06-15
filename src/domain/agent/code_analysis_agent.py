@@ -191,7 +191,7 @@ Enhanced Analysis:"""
             logging.error(f"RAG enhancement failed: {e}, using original prompt")
             return original_prompt
 
-    def action(self, target_path="./", additional_prompt=""):
+    def action(self, target_path="./", additional_prompt="",output_path=""):
         """执行代码分析，逻辑与原main函数相同，但支持额外prompt和历史记录"""
 
         # 处理路径格式
@@ -467,15 +467,15 @@ Enhanced Analysis:"""
                 # 保存结果文件
                 project_name = os.path.basename(os.path.abspath(target_path.rstrip('/'))) or "project"
                 output_file = f"{project_name}_analysis_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-                with open(output_file, "w", encoding="utf-8") as f:
+                with open(os.path.join(output_path,output_file), "w", encoding="utf-8") as f:
                     json.dump(output_data, f, ensure_ascii=False, indent=2)
 
                 get_stream_writer()({
-                    "data": AiChatResultVO(text=f"📁 分析结果已保存到文件: {output_file}").model_dump_json(
+                    "data": AiChatResultVO(text=f"📁 分析结果已保存到文件: {os.path.join(output_path,output_file)}").model_dump_json(
                         exclude_none=True
                     )
                 })
-                logging.info(f"Analysis results saved to file: {output_file}")
+                logging.info(f"Analysis results saved to file: {os.path.join(output_path,output_file)}")
 
                 # 生成数据集信息文件
                 dataset_info = extract_dataset_info_from_analysis(final_messages, final_summary)
@@ -484,15 +484,15 @@ Enhanced Analysis:"""
                 dataset_info["additional_prompt_used"] = additional_prompt
 
                 dataset_info_file = f"{project_name}_dataset_info_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-                with open(dataset_info_file, "w", encoding="utf-8") as f:
+                with open(os.path.join(output_path,dataset_info_file), "w", encoding="utf-8") as f:
                     json.dump(dataset_info, f, ensure_ascii=False, indent=2)
 
                 get_stream_writer()({
-                    "data": AiChatResultVO(text=f"📊 数据集信息已保存到文件: {dataset_info_file}").model_dump_json(
+                    "data": AiChatResultVO(text=f"📊 数据集信息已保存到文件: {os.path.join(output_path,dataset_info_file)}").model_dump_json(
                         exclude_none=True
                     )
                 })
-                logging.info(f"Dataset-specific information saved to file: {dataset_info_file}")
+                logging.info(f"Dataset-specific information saved to file: {os.path.join(output_path,dataset_info_file)}")
 
                 # 生成Markdown报告
                 markdown_content = f"""# {project_name.title()} Analysis Report
@@ -510,34 +510,34 @@ Historical Context Used: {'Yes' if len(self.analysis_history) > 1 else 'No'}
 """
 
                 markdown_file = f"{project_name}_analysis_report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
-                with open(markdown_file, "w", encoding="utf-8") as f:
+                with open(os.path.join(output_path,markdown_file), "w", encoding="utf-8") as f:
                     f.write(markdown_content)
 
                 get_stream_writer()({
-                    "data": AiChatResultVO(text=f"📝 简洁报告已保存到文件: {markdown_file}").model_dump_json(
+                    "data": AiChatResultVO(text=f"📝 简洁报告已保存到文件: {os.path.join(output_path,markdown_file)}").model_dump_json(
                         exclude_none=True
                     )
                 })
-                logging.info(f"Concise report saved to file: {markdown_file}")
+                logging.info(f"Concise report saved to file: {os.path.join(output_path,markdown_file)}")
 
                 # 读取生成的文件内容
                 file_contents = {}
                 try:
-                    with open(output_file, "r", encoding="utf-8") as f:
+                    with open(os.path.join(output_path,output_file), "r", encoding="utf-8") as f:
                         file_contents["analysis_json"] = json.load(f)
                 except Exception as e:
                     logging.error(f"Failed to read {output_file}: {e}")
                     file_contents["analysis_json"] = None
 
                 try:
-                    with open(dataset_info_file, "r", encoding="utf-8") as f:
+                    with open(os.path.join(output_path,dataset_info_file), "r", encoding="utf-8") as f:
                         file_contents["dataset_info_json"] = json.load(f)
                 except Exception as e:
                     logging.error(f"Failed to read {dataset_info_file}: {e}")
                     file_contents["dataset_info_json"] = None
 
                 try:
-                    with open(markdown_file, "r", encoding="utf-8") as f:
+                    with open(os.path.join(output_path,markdown_file), "r", encoding="utf-8") as f:
                         file_contents["markdown_report"] = f.read()
                 except Exception as e:
                     logging.error(f"Failed to read {markdown_file}: {e}")
@@ -1573,9 +1573,7 @@ def extract_custom_dataset_guidelines_detailed(content):
 def extract_code_examples(content):
     """提取代码示例"""
     examples = []
-
     import re
-
     # 提取所有代码块
     code_blocks = re.findall(r'```(?:python|py|bash|shell)?\n(.*?)\n```', content, re.DOTALL)
 
