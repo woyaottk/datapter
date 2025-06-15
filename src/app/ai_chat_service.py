@@ -1,11 +1,12 @@
 import asyncio
 import logging
+import os
 import sys
 from pathlib import Path
 import json
 
 from langchain_core.messages import HumanMessage
-from sse_starlette.sse import AsyncContentStream
+from sse_starlette.sse import AsyncContentStream, logger
 
 from src.adapter.vo.ai_chat_model import ChatInputVO, AiChatResultVO
 from src.domain.agent.coordinator_agent import CoordinatorAgent
@@ -41,6 +42,7 @@ async def chat_handler(request: ChatInputVO) -> AsyncContentStream:
                 "conversationId": conversation_id,
                 "messageId": str(sf.generate()),
                 "nextAgents": [],
+                "nextPrompts": [],
             }
             try:
                 ai_response_text = ""
@@ -76,6 +78,10 @@ async def chat_handler(request: ChatInputVO) -> AsyncContentStream:
                 logging.error("timeout")
         except Exception as e:
             logging.error(e)
+            if os.getenv("DEBUG", "false") == "true":
+                import traceback
+                traceback.print_stack()
+                exit(0)
 
     except Exception as e:
         logging.error(e)

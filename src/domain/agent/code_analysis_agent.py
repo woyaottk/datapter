@@ -308,7 +308,7 @@ Enhanced Analysis:"""
         tool_agent = create_react_agent(
             tool_model,
             tools,
-            state_modifier=tool_system_message,
+            prompt=tool_system_message,
             checkpointer=memory
         )
         self.tool_agent = tool_agent

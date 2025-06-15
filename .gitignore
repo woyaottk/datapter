@@ -2,7 +2,7 @@
 /logs/
 .idea/
 /data/
-
+chroma_db
 # Python cache files
 *.py[cod]
 *.pyc
