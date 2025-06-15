@@ -8,10 +8,11 @@ from typing import List, Optional, Dict, Any
 # --- LangChain/LangGraph 核心库导入 ---
 from langchain.output_parsers import PydanticOutputParser
 from langchain_core.language_models import BaseLanguageModel
-from langgraph.config import get_stream_writer
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
+from langgraph.config import get_stream_writer
+from src.adapter.vo.ai_chat_model import AiChatResultVO
 from src.domain.constant.constant import AgentTypeEnum
 # --- 项目内部模块导入 ---
 from src.domain.model.model import DatasetAgentState
@@ -122,6 +123,11 @@ def _build_enhancement_prompt(file_tree: Dict[str, Any], summary_stats: Dict[str
 
 # === 3. 主要智能体类 ===
 
+async def pretty_dump(data: Dict[str,Any]) -> Optional[str]:
+    """格式化输出数据为美观的JSON字符串。"""
+    return json.dumps(data, ensure_ascii=False, indent=2)
+
+
 class DatasetAgent:
     def __init__(self):
         """初始化智能体。"""
@@ -135,8 +141,11 @@ class DatasetAgent:
         state = None
         try:
             # --- 初始化 ---
-            config = load_config()
             writer = get_stream_writer()
+            writer({
+            "data": AiChatResultVO(text=f"你的输出").model_dump_json(exclude_none=True)
+            })
+            config = load_config()
             llm = LLMFactory.create_llm(LLMType.QWEN)
             state = global_state.get("dataset_state")
             input_path = state.get("input_path",".")
@@ -146,12 +155,18 @@ class DatasetAgent:
             # --- 按新的 5 个阶段顺序执行 ---
             output_dir, processed_dir = await self._run_stage_1_setup(input_path, config, decompress_and_create_replica)
             raw_file_tree = await self._run_stage_2_analyze_tree(processed_dir, output_dir, config, analyze_file_tree)
-            writer(str(raw_file_tree))
+            writer({
+                "data": AiChatResultVO(text=pretty_dump(raw_file_tree)).model_dump_json(exclude_none=True)
+            })
             metadata_enriched_tree = await self._run_stage_3_read_metadata(raw_file_tree, processed_dir, config,
                                                                            read_file_metadata)
-            writer(str(metadata_enriched_tree))
+            writer({
+                "data": AiChatResultVO(text=pretty_dump(metadata_enriched_tree)).model_dump_json(exclude_none=True)
+            })
             enhanced_tree_dict = await self._run_stage_4_enhance_tree(metadata_enriched_tree, llm)
-            writer(str(enhanced_tree_dict))
+            writer({
+                "data": AiChatResultVO(text=pretty_dump(enhanced_tree_dict)).model_dump_json(exclude_none=True)
+            })
             filename, json_string = await self._run_stage_5_save_results(enhanced_tree_dict, output_dir)
 
             # --- 成功返回，填充状态字典 ---
