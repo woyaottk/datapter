@@ -153,8 +153,8 @@ class AdapterAgent:
                 '\n',
                 '以下是模型代码分析结果：',
                 state['model_analyse'][-1]['markdown'],
-                state['json_out'][-1]['markdown'],
-                state['summary'][-1]['markdown'],
+                state['model_analyse'][-1]['json_out'],
+                state['model_analyse'][-1]['summary'],
             ]
         )
 
