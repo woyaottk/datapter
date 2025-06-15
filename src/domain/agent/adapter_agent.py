@@ -142,6 +142,22 @@ class AdapterAgent:
         print(f'[AdapterAgent] called, state: {{"conversationId": {conversation_id}}}')
         print('这是Coordinator传递给我的prompt：' + state['prompt'])
 
+        prompt = '\n'.join(
+            [
+                '根据以下要求和数据集、模型代码分析结果，制定一个清晰、可执行的适配方案。',
+                '\n',
+                state['prompt'],
+                '\n',
+                '以下是数据集分析结果：',
+                state['dataset_state']['enhanced_file_tree_json'],
+                '\n',
+                '以下是模型代码分析结果：',
+                state['model_analyse'][-1]['markdown'],
+                state['json_out'][-1]['markdown'],
+                state['summary'][-1]['markdown'],
+            ]
+        )
+
         prompts = ChatPromptTemplate.from_messages(
             [
                 SystemMessagePromptTemplate.from_template(SYSTEM_PROMPT),
@@ -160,7 +176,7 @@ class AdapterAgent:
         async for chunk in chain.astream(
             {
                 'format_instructions': parser.get_format_instructions(),
-                'prompt': state['prompt'],
+                'prompt': prompt,
             }
         ):
             if chunk.content:
