@@ -43,7 +43,8 @@ async def chat_handler(request: ChatInputVO) -> AsyncContentStream:
                 "messageId": str(sf.generate()),
                 "nextAgents": ['ModelAgent'],# change next
                 "nextPrompts": ['请你分析这个模型的数据加载方法和dataloader结构'],
-                "model_analyse_path":"data/output/code/",
+                "model_path": os.getenv("CODE.INPUT_DIR"),
+                "model_analyse_path":os.getenv("CODE.OUTPUT_DIR"),
                 "model_analyse":[]
             }
             try:
