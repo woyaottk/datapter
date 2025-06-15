@@ -193,6 +193,8 @@ Enhanced Analysis:"""
 
     def action(self, target_path="./", additional_prompt="",output_path=""):
         """执行代码分析，逻辑与原main函数相同，但支持额外prompt和历史记录"""
+        # 初始化输出目录
+        os.makedirs(output_path, exist_ok=True)
 
         # 处理路径格式
         if not target_path.endswith('/'):
