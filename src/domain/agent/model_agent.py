@@ -1,5 +1,6 @@
 from langgraph.config import get_stream_writer
 from langgraph.types import Command
+import logging
 
 from src.adapter.vo.ai_chat_model import AiChatResultVO
 from src.domain.agent.code_analysis_agent import CodeAnalysisAgent
@@ -19,6 +20,8 @@ class ModelAgent:
         try:
             path = state['model_path']
             out_path = state['model_analyse_path']
+            logging.info(f"model_path: {path}")
+            logging.info(f"model_analyse_path: {out_path}")
         except KeyError:
             get_stream_writer()({
                 "data": AiChatResultVO(text="❌ No model path provided").model_dump_json(
