@@ -156,18 +156,8 @@ class CoordinatorAgent:
         response: Router  = Router.model_validate_json(json_str)
         print(response)
         print("===============")
-        # exit(0)
-        # response: Router = await chain.ainvoke(
-        #     {"format_instructions": suggestion_parser.get_format_instructions()}
-        # )
 
         logging.info(f"[Coordinator] isInit=True, response: {response}, state: {{'conversationId': {conversation_id}}}")
-
-        # state["nextAgents"] = response.nextAgents
-        # state["prompts"] = response.prompts
-        # state["isInit"] = False
-        # state["context"] = None
-        # state["gotoEnd"] = False
 
         return Command(
             goto=__name__,
@@ -211,15 +201,6 @@ class CoordinatorAgent:
         if goto == "FINISH":
             logging.info(f"[Coordinator] goto FINISH，流转到 END，state: {{'conversationId': {conversation_id}}}")
             return Command(goto=END)
-        elif goto == 'DecisionAgent':
-            return Command(
-                goto=goto,
-                update={
-                    "nextAgents": remaining_agents,
-                    "nextPrompts": remaining_prompts,
-                    "prompt": prompt,
-                }
-            )
         elif goto == 'DatasetAgent':
             return Command(
                 goto=goto,
@@ -261,14 +242,12 @@ class CoordinatorAgent:
         builder.add_node('DatasetAgent', DatasetAgent())
         builder.add_node('ModelAgent', ModelAgent())
         builder.add_node('AdapterAgent', AdapterAgent())
-        # builder.add_node('DecisionAgent', DecisionAgent())
 
         # 添加边
         builder.add_edge(START, __name__)
         builder.add_edge('DatasetAgent', __name__)
         builder.add_edge('ModelAgent', __name__)
         builder.add_edge('AdapterAgent', __name__)
-        # builder.add_edge('DecisionAgent', __name__)
         return builder.compile(
             debug=os.getenv("DEBUG", "False").strip().lower() == "true",
         )
