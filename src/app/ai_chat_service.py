@@ -41,8 +41,10 @@ async def chat_handler(request: ChatInputVO) -> AsyncContentStream:
                 "gotoEnd": False,
                 "conversationId": conversation_id,
                 "messageId": str(sf.generate()),
-                "nextAgents": [],
-                "nextPrompts": [],
+                "nextAgents": ['ModelAgent'],# change next
+                "nextPrompts": ['请你分析这个模型的数据加载方法和dataloader结构'],
+                "model_analyse_path":"data/output/code/",
+                "model_analyse":[]
             }
             try:
                 ai_response_text = ""
