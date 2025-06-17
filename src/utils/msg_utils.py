@@ -41,6 +41,6 @@ class MessageBox(object):
         yield
 
     @classmethod
-    def write_block(cls, text: str, role: str='assistant'):
+    def write_block(cls, text: str, role: str='system'):
         return MessageBox(type='block', role=role).write(text)
         
