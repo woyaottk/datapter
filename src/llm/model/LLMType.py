@@ -12,6 +12,8 @@ _config_initialized = False
 class LLMType(Enum):
     """LLM类型枚举"""
     QWEN = "QWEN"
+    QWEN3 = "QWEN3"
+    QWEN_PLUS = "QWEN_PLUS"
     QWEN_MAX = "QWEN_MAX"
     DEEPSEEK_CHAT = "DEEPSEEK_CHAT"
     DEEPSEEK_REASON = "DEEPSEEK_REASON"

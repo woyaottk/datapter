@@ -1,32 +1,28 @@
+import datetime
+import json
 import logging
 import os
 
-from langgraph.config import get_stream_writer
-
-from src.adapter.vo.ai_chat_model import AiChatResultVO
-from src.domain.model.model import  CollaborativeAgentState
-
-import datetime
-import json
-
-from langgraph.graph import StateGraph, START, END
-
 # RAG系统相关导入
 from langchain_chroma import Chroma
+from langchain_community.tools.file_management import ListDirectoryTool, FileSearchTool, ReadFileTool, WriteFileTool
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_core.prompts import PromptTemplate
-
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import create_react_agent
-from langchain_community.tools.file_management import ListDirectoryTool, FileSearchTool, ReadFileTool,WriteFileTool
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+
+from src.domain.model.model import CollaborativeAgentState
+from src.utils.msg_utils import MessageBox
+
 
 class CodeAnalysisAgent:
     """代码分析代理类，包含专业的RAG历史记录系统"""
 
-    def __init__(self, chat_model, reason_model, embedding_model=None, chroma_persist_directory="./chroma_db"):
+    def __init__(self, chat_model, reason_model, embedding_model=None, chroma_persist_directory="./chroma_db", message_id:str = None):
         """初始化代理，包括模型和RAG系统"""
         # 初始化模型
         self.tool_model = chat_model  # ChatDeepSeek(model="deepseek-chat")
@@ -61,6 +57,9 @@ class CodeAnalysisAgent:
 
         # 工具模型代理（将在action中动态创建）
         self.tool_agent = None
+
+        # 消息输出
+        self.msg_box = MessageBox(message_id=message_id)
 
         logging.info("CodeAnalysisAgent initialized with professional RAG system")
 
@@ -346,11 +345,7 @@ Enhanced Analysis:"""
             logging.info("⚠️ [RAG_ENHANCEMENT] RAG系统未能增强prompt，使用原始prompt")
 
         # 执行分析
-        get_stream_writer()({
-            "data": AiChatResultVO(text=f"🚀 启动协作代理系统分析路径: {target_path}").model_dump_json(
-                exclude_none=True
-            )
-        })
+        self.msg_box.write(f"🚀 启动协作代理系统分析路径: {target_path}\n\n")
         logging.info(f"🚀 初始提示词长度: {len(final_prompt)} 字符")
         logging.info(f"🚀 目标路径: {target_path}")
         logging.info(f"🚀 配置: {config}")
@@ -366,18 +361,14 @@ Enhanced Analysis:"""
                         "current_working_path": target_path,
                         "discovered_paths": [],
                         "path_context": {},
-                        "target_base_path": target_path
+                        "target_base_path": target_path,
+                        "message_id": self.msg_box.message_id,
                     },
                     config,
                     stream_mode="values",
             ):
                 step_count += 1
-                get_stream_writer()({
-                    "data": AiChatResultVO(
-                        text=f"🔄 步骤 {step_count}: 分析进行中... (发现 {len(step.get('discovered_paths', []))} 个路径)").model_dump_json(
-                        exclude_none=True
-                    )
-                })
+                self.msg_box.write(f"🔄 步骤 {step_count}: 分析进行中... (发现 {len(step.get('discovered_paths', []))} 个路径)\n\n")
                 logging.info(f"\n{'=' * 50}")
                 logging.info(f"🔄 [STEP {step_count}] Current node: {step.get('node_name', 'Unknown')}")
                 logging.info(f"🔄 [STEP {step_count}] Need more info: {step.get('need_more_info', 'Unknown')}")
@@ -399,11 +390,7 @@ Enhanced Analysis:"""
                 logging.info(f"{'=' * 50}")
                 final_state = step
 
-            get_stream_writer()({
-                "data": AiChatResultVO(text=f"🎉 分析完成! 总共执行了 {step_count} 个步骤").model_dump_json(
-                    exclude_none=True
-                )
-            })
+            self.msg_box.write(f"🎉 分析完成! 总共执行了 {step_count} 个步骤\n\n")
             logging.info(f"\n🎉 Execution completed! Total steps: {step_count}")
 
             # 显示最终状态的详细信息
@@ -472,11 +459,7 @@ Enhanced Analysis:"""
                 with open(os.path.join(output_path,output_file), "w", encoding="utf-8") as f:
                     json.dump(output_data, f, ensure_ascii=False, indent=2)
 
-                get_stream_writer()({
-                    "data": AiChatResultVO(text=f"📁 分析结果已保存到文件: {os.path.join(output_path,output_file)}").model_dump_json(
-                        exclude_none=True
-                    )
-                })
+                self.msg_box.write(f"📁 分析结果已保存到文件: {os.path.join(output_path,output_file)}\n\n")
                 logging.info(f"Analysis results saved to file: {os.path.join(output_path,output_file)}")
 
                 # 生成数据集信息文件
@@ -489,11 +472,7 @@ Enhanced Analysis:"""
                 with open(os.path.join(output_path,dataset_info_file), "w", encoding="utf-8") as f:
                     json.dump(dataset_info, f, ensure_ascii=False, indent=2)
 
-                get_stream_writer()({
-                    "data": AiChatResultVO(text=f"📊 数据集信息已保存到文件: {os.path.join(output_path,dataset_info_file)}").model_dump_json(
-                        exclude_none=True
-                    )
-                })
+                self.msg_box.write(f"📊 数据集信息已保存到文件: {os.path.join(output_path,dataset_info_file)}\n\n")
                 logging.info(f"Dataset-specific information saved to file: {os.path.join(output_path,dataset_info_file)}")
 
                 # 生成Markdown报告
@@ -515,11 +494,7 @@ Historical Context Used: {'Yes' if len(self.analysis_history) > 1 else 'No'}
                 with open(os.path.join(output_path,markdown_file), "w", encoding="utf-8") as f:
                     f.write(markdown_content)
 
-                get_stream_writer()({
-                    "data": AiChatResultVO(text=f"📝 简洁报告已保存到文件: {os.path.join(output_path,markdown_file)}").model_dump_json(
-                        exclude_none=True
-                    )
-                })
+                self.msg_box.write(f"📝 简洁报告已保存到文件: {os.path.join(output_path,markdown_file)}\n\n")
                 logging.info(f"Concise report saved to file: {os.path.join(output_path,markdown_file)}")
 
                 # 读取生成的文件内容
@@ -565,11 +540,7 @@ Historical Context Used: {'Yes' if len(self.analysis_history) > 1 else 'No'}
                 }
 
         except Exception as e:
-            get_stream_writer()({
-                "data": AiChatResultVO(text=f"❌ 分析过程中发生错误: {str(e)}").model_dump_json(
-                    exclude_none=True
-                )
-            })
+            self.msg_box.write(f"❌ 分析过程中发生错误: {str(e)}\n\n")
             logging.error(f"Error during analysis: {e}")
             return {
                 "success": False,
@@ -659,6 +630,7 @@ Historical Context Used: {'Yes' if len(self.analysis_history) > 1 else 'No'}
 # tool工具模型节点
 def tool_tool_node(state):
     """使用tool模型调用工具获取信息"""
+    msg_box = MessageBox(message_id=state['message_id'])
     messages = state["messages"]
     current_path = state.get("current_working_path", "./")
     discovered_paths = state.get("discovered_paths", [])
@@ -726,12 +698,7 @@ def tool_tool_node(state):
             # 修改最后一条消息以包含路径上下文
             enhanced_message = HumanMessage(content=path_context_msg)
             messages = messages[:-1] + [enhanced_message]
-
-        get_stream_writer()({
-            "data": AiChatResultVO(text="🔧 开始调用工具模型进行代码分析...").model_dump_json(
-                exclude_none=True
-            )
-        })
+        msg_box.write("🔧 开始调用工具模型进行代码分析...\n\n")
         logging.info(f"🔧 [TOOL_NODE] 输入消息数量: {len(messages)}")
         if messages:
             logging.info(f"🔧 [TOOL_NODE] 最后一条消息类型: {messages[-1].type}")
@@ -745,19 +712,11 @@ def tool_tool_node(state):
         logging.info("=" * 60)
 
         if result.get("messages"):
-            get_stream_writer()({
-                "data": AiChatResultVO(text=f"📊 工具模型返回了 {len(result['messages'])} 条消息").model_dump_json(
-                    exclude_none=True
-                )
-            })
+            msg_box.write(f"📊 工具模型返回了 {len(result['messages'])} 条消息\n\n")
             logging.info(f"📊 返回消息数量: {len(result['messages'])}")
             for i, msg in enumerate(result["messages"]):
                 if msg.type == "ai" and len(msg.content) > 100:  # 只输出重要的AI回复
-                    get_stream_writer()({
-                        "data": AiChatResultVO(text=f"🔧 工具分析结果 {i + 1}: {msg.content[:200]}...").model_dump_json(
-                            exclude_none=True
-                        )
-                    })
+                    msg_box.write(f"🔧 工具分析结果 {i + 1}: {msg.content[:200]}...\n\n")
                 logging.info(f"\n--- 消息 {i + 1} ---")
                 logging.info(f"类型: {msg.type}")
                 logging.info(f"内容长度: {len(msg.content)} 字符")
@@ -765,11 +724,7 @@ def tool_tool_node(state):
                 logging.info(msg.content)
                 logging.info("-" * 40)
         else:
-            get_stream_writer()({
-                "data": AiChatResultVO(text="⚠️ 工具模型没有返回任何消息").model_dump_json(
-                    exclude_none=True
-                )
-            })
+            msg_box.write("⚠️ 工具模型没有返回任何消息\n\n")
             logging.info("⚠️ 工具模型没有返回任何消息")
 
         logging.info("=" * 60)
@@ -795,11 +750,7 @@ def tool_tool_node(state):
                 for path in successful_paths:
                     if path not in updated_discovered:
                         updated_discovered.append(path)
-                        get_stream_writer()({
-                            "data": AiChatResultVO(text=f"🔍 发现新路径: {path}").model_dump_json(
-                                exclude_none=True
-                            )
-                        })
+                        msg_box.write(f"🔍 发现新路径: {path}\n\n")
                         logging.info(f"Discovered new path: {path}")
 
                 # 检测路径错误并提供智能恢复
@@ -991,6 +942,8 @@ def reason_node(state):
     path_context = state.get("path_context", {})
     target_base_path = state.get("target_base_path", "./")
 
+    msg_box = MessageBox(message_id=state['message_id'])
+
     # 动态分析项目结构
     project_structure_analysis = "Unknown structure"
     if discovered_paths:
@@ -1047,11 +1000,7 @@ def reason_node(state):
     Be DECISIVE and SPECIFIC. Use full paths in instructions based on the project structure.
     """
 
-    get_stream_writer()({
-        "data": AiChatResultVO(text="🧠 开始推理分析，整理代码分析结果...").model_dump_json(
-            exclude_none=True
-        )
-    })
+    msg_box.write("🧠 开始推理分析，整理代码分析结果...\n\n")
     logging.info(f"🧠 [REASON_NODE] 输入提示词长度: {len(system_prompt)} 字符")
     logging.info(f"🧠 [REASON_NODE] 当前信息摘要长度: {len(current_summary)} 字符")
     logging.info(f"🧠 [REASON_NODE] 发现的路径数量: {len(discovered_paths)}")
@@ -1060,12 +1009,7 @@ def reason_node(state):
     reasoning_result = reason_model.invoke(system_prompt)
 
     # 详细显示推理模型的输出
-    get_stream_writer()({
-        "data": AiChatResultVO(
-            text=f"🧠 推理模型分析完成，生成了 {len(reasoning_result.content)} 字符的分析结果").model_dump_json(
-            exclude_none=True
-        )
-    })
+    msg_box.write(f"🧠 推理模型分析完成，生成了 {len(reasoning_result.content)} 字符的分析结果\n\n")
     logging.info("\n" + "=" * 60)
     logging.info("🧠 [REASONING_MODEL_OUTPUT] 推理模型完整输出:")
     logging.info("=" * 60)
@@ -1090,11 +1034,7 @@ def reason_node(state):
         path_suggestion = analysis.split("PATH_UPDATE:")[1].split("INSTRUCTIONS:")[0].split("FINAL_ANSWER:")[0].strip()
         if path_suggestion and path_suggestion != "None" and path_suggestion != "":
             updated_path = path_suggestion
-            get_stream_writer()({
-                "data": AiChatResultVO(text=f"📁 更新工作路径: {current_path} -> {updated_path}").model_dump_json(
-                    exclude_none=True
-                )
-            })
+            msg_box.write(f"📁 更新工作路径: {current_path} -> {updated_path}\n\n")
         logging.info(f"Updating working path: {current_path} -> {updated_path}")
 
     # 提取最终分析结果

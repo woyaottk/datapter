@@ -5,23 +5,24 @@ JDSecondCoordinator - 一个基于LangGraph的多智能体系统。
 # 标准库导入
 import logging
 import os
+import time
 from typing import Literal, List
+
 # 第三方库导入
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate
 from langgraph.constants import END
-from langgraph.config import get_stream_writer
 from langgraph.graph import StateGraph, START
 from langgraph.types import Command
 from pydantic import Field, BaseModel
 
-from src.adapter.vo.ai_chat_model import AiChatResultVO
 from src.domain.agent.adapter_agent import AdapterAgent
 from src.domain.agent.dataset_agent import DatasetAgent
-from src.domain.model.model import AdapterState, DatasetAgentState
 from src.domain.agent.model_agent import ModelAgent
+from src.domain.model.model import AdapterState
 from src.llm.llm_factory import LLMFactory
 from src.llm.model.LLMType import LLMType
+from src.utils.msg_utils import MessageBox
 
 SYSTEM_PROMPT = '''
 # 角色
@@ -40,8 +41,6 @@ SYSTEM_PROMPT = '''
 - 控制任务流程（一般为：先分析 → 后适配），但若用户已有分析结果或跳过分析环节，你应支持跳转执行
 - 如用户没有提供额外信息和偏好，则按照标准流程进行；如任务完成，路由至 FINISH
 - 应尽可能利用子agent来获取文件的信息，而不是要求用户输入偏好
-- 可以根据分析结果，向用户询问建议，但必须提供一个默认的操作，例如：获取到分析结果后，输出并询问用户是否符合预期，并告知用户没有问题则将进入适配阶段。
-- 若询问用户并得到反馈后，应当根据反馈调整下一步要调用的agent及prompt
 
 你不负责：
 - 分析数据集内容
@@ -55,11 +54,9 @@ SYSTEM_PROMPT = '''
 - **FINISH**：用户显式表示任务结束时路由至此。
 
 # 流程建议
-常见标准流程如下：
-1. 用户初始上传数据集和代码，未提供分析结果 → 先调用 DatasetAgent 和 ModelAgent，获取分析报告
-2. 检查报告结果是否正常，若正常执行下一步，若异常则反馈给用户
-3. 分析报告就绪 → 向 AdapterAgent 发送分析报告地址，并传递用户可能提出的偏好或约束，生成适配方案
-4. 用户验收适配效果，主动声明任务完成 → 路由至 FINISH
+若用户没有特殊要求或偏好，则按照标准流程如下：
+DatasetAgent -> ModelAgent -> AdapterAgent -> FINISH
+即对应的nextAgents序列为[DatasetAgent, ModelAgent, AdapterAgent, FINISH]
 
 但你必须支持用户自定义流程（跳过某步、重新执行某步或追加说明）
 
@@ -107,7 +104,6 @@ class CoordinatorAgent:
 
     async def create_agent_chain(self, state: AdapterState):
         conversation_id = state["conversationId"]
-        suggestion_parser = PydanticOutputParser(pydantic_object=Router)
         prompts = ChatPromptTemplate.from_messages(
             [SystemMessagePromptTemplate.from_template(SYSTEM_PROMPT)]
         )
@@ -126,7 +122,7 @@ class CoordinatorAgent:
         reason_buffer = ""
         instruction_buffer = ""
         reasoning = True
-        writer = get_stream_writer()
+        msg_box = MessageBox()
         async for chunk in chain.astream({
             'format_instructions': PydanticOutputParser(pydantic_object=Router).get_format_instructions()
         }):
@@ -141,7 +137,7 @@ class CoordinatorAgent:
                     elif buf.endswith('`'):
                         continue
                     else:
-                        writer({'data': AiChatResultVO(text=chunk.content).model_dump_json(exclude_none=True)})
+                        msg_box.write(chunk.content)
                         reason_buffer += buf
                         buf = ""
                 else:
@@ -208,7 +204,6 @@ class CoordinatorAgent:
                     "nextAgents": remaining_agents,
                     "nextPrompts": remaining_prompts,
                     "prompt": prompt,
-                    "dataset_state": DatasetAgentState(input_path=os.getenv("DATASET.INPUT_DIR", "data/input/dataset")),
                 },
             )
         elif goto == 'ModelAgent':

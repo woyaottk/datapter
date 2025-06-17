@@ -4,15 +4,14 @@ from typing import List, Tuple
 
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate
-from langgraph.config import get_stream_writer
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
-from src.adapter.vo.ai_chat_model import AiChatResultVO
 from src.domain.constant.constant import AgentTypeEnum
 from src.domain.model.model import AdapterState, command_update
 from src.llm.llm_factory import LLMFactory
 from src.llm.model.LLMType import LLMType
+from src.utils.msg_utils import MessageBox
 
 SYSTEM_PROMPT = '''
 # 角色
@@ -138,6 +137,8 @@ class AdapterAgent:
         return operations
 
     async def __call__(self, state: AdapterState) -> Command:
+        msg_box = MessageBox()
+        await msg_box.write_block("AdapterAgent已被调用").flush()
         conversation_id = state['conversationId']
         print(f'[AdapterAgent] called, state: {{"conversationId": {conversation_id}}}')
         print('这是Coordinator传递给我的prompt：' + state['prompt'])
@@ -172,7 +173,6 @@ class AdapterAgent:
         reason_buffer = ''
         instruction_buffer = ''
         reasoning = True
-        writer = get_stream_writer()
         async for chunk in chain.astream(
             {
                 'format_instructions': parser.get_format_instructions(),
@@ -190,23 +190,11 @@ class AdapterAgent:
                     elif buf.endswith('`'):
                         continue
                     else:
-                        writer(
-                            {
-                                'data': AiChatResultVO(text=chunk.content).model_dump_json(
-                                    exclude_none=True
-                                )
-                            }
-                        )
+                        msg_box.write(chunk.content)
                         reason_buffer += buf
                         buf = ''
                 else:
-                    print(
-                        {
-                            'data': AiChatResultVO(text=chunk.content).model_dump_json(
-                                exclude_none=True
-                            )
-                        }
-                    )
+                    msg_box.write(chunk.content)
                     instruction_buffer += chunk.content
 
         print('===============')
@@ -225,8 +213,8 @@ class AdapterAgent:
         for file, content in zip(response.files, response.contents):
             result = self.file_operator.create_file(file, content)
             file_operation_results.append(result)
-            writer(f'[文件操作] {result}')
-        writer(f'你还需要执行以下命令:\n\n{'\n\n'.join(response.commands)}\n\n')
+            msg_box.write(f'[文件操作] {result}\n\n')
+        msg_box.write(f'你还需要执行以下命令:\n\n{'\n\n'.join(response.commands)}\n\n')
 
         # 将操作结果保存到状态
         state['file_operations'] = file_operation_results

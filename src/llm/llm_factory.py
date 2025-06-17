@@ -22,6 +22,8 @@ class LLMFactory:
     # 工厂类映射
     _factory_map: Dict[LLMType, Type] = {
         LLMType.QWEN: OpenAIFactory,
+        LLMType.QWEN3: OpenAIFactory,
+        LLMType.QWEN_PLUS: OpenAIFactory,
         LLMType.QWEN_MAX: TongyiFactory,
         LLMType.DEEPSEEK_CHAT: DeepSeekFactory,
         LLMType.DEEPSEEK_REASON: DeepSeekFactory,

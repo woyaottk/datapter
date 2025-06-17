@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict
 import asyncio
 from langchain_community.llms.tongyi import Tongyi
@@ -23,6 +24,8 @@ class TongyiFactory:
         Returns:
             Any: LLM实例
         """
+        print(config["api_key"])
+        os.environ["DASHSCOPE_API_KEY"] = config["api_key"]
         return Tongyi(
             model=config["model_name"],
             DASHSCOPE_API_KEY=config["api_key"],

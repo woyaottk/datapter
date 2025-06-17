@@ -11,8 +11,6 @@ from langchain_core.language_models import BaseLanguageModel
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
-from langgraph.config import get_stream_writer
-from src.adapter.vo.ai_chat_model import AiChatResultVO
 from src.domain.constant.constant import AgentTypeEnum
 # --- 项目内部模块导入 ---
 from src.domain.model.model import DatasetAgentState
@@ -22,6 +20,7 @@ from src.llm.model.LLMType import LLMType
 from src.tools.ArchiveDecompressionTool import decompress_and_create_replica
 from src.tools.FileTreeAnalysisTool import analyze_file_tree
 from src.tools.MetaFileReadTool import read_file_metadata
+from src.utils.msg_utils import MessageBox
 
 
 # === 1. Pydantic 数据结构定义 (Agent内部使用) ===
@@ -124,12 +123,13 @@ def _build_enhancement_prompt(file_tree: Dict[str, Any], summary_stats: Dict[str
 # === 3. 主要智能体类 ===
 def pretty_dump(data: Dict[str,Any]) -> str:
     """格式化输出数据为美观的JSON字符串。"""
-    return json.dumps(data, ensure_ascii=False, indent=2).replace('\n', '\\n')
+    return '```json\n' + json.dumps(data, ensure_ascii=False, indent=2) + '\n```\n\n'
 
 
 class DatasetAgent:
     def __init__(self):
         """初始化智能体。"""
+        self.msg_box = None
         pass
 
     async def __call__(self, global_state: AdapterState) -> Command:
@@ -137,10 +137,12 @@ class DatasetAgent:
         LangGraph框架调用的主入口点。
         以批处理模式执行完整的分析流程，并返回一个包含最终输出字段的字典。
         """
+        self.msg_box = MessageBox(role='dataset_agent')
+        await MessageBox.write_block("Dataset Agent 已被调用.").flush()
+
         state = None
         try:
             # --- 初始化 ---
-            writer = get_stream_writer()
             config = load_config()
             llm = LLMFactory.create_llm(LLMType.QWEN)
             state = global_state.get("dataset_state")
@@ -151,21 +153,24 @@ class DatasetAgent:
             # --- 按新的 5 个阶段顺序执行 ---
             output_dir, processed_dir = await self._run_stage_1_setup(input_path, config, decompress_and_create_replica)
             raw_file_tree = await self._run_stage_2_analyze_tree(processed_dir, output_dir, config, analyze_file_tree)
-            writer({"data": AiChatResultVO(text=pretty_dump(raw_file_tree)).model_dump_json(exclude_none=True)})
+            await self.msg_box.write(pretty_dump(raw_file_tree)).flush()
             metadata_enriched_tree = await self._run_stage_3_read_metadata(raw_file_tree, processed_dir, config,
                                                                            read_file_metadata)
-            writer({"data": AiChatResultVO(text=pretty_dump(metadata_enriched_tree)).model_dump_json(exclude_none=True)})
+            await self.msg_box.write(pretty_dump(metadata_enriched_tree)).flush()
             enhanced_tree_dict = await self._run_stage_4_enhance_tree(metadata_enriched_tree, llm)
-            writer({"data": AiChatResultVO(text=pretty_dump(enhanced_tree_dict)).model_dump_json(exclude_none=True)})
+            await self.msg_box.write(pretty_dump(enhanced_tree_dict)).flush()
             filename, json_string = await self._run_stage_5_save_results(enhanced_tree_dict, output_dir)
 
             # --- 成功返回，填充状态字典 ---
             logging.info("[DatasetAgent] 运行成功, 返回最终状态。")
-            writer({"data": AiChatResultVO(text="[DatasetAgent] 运行成功, 返回最终状态。\n").model_dump_json(exclude_none=True)})
+            await self.msg_box.write("[DatasetAgent] 运行成功, 返回最终状态。\n\n").flush()
+            logging.info("===1===")
             state['output_path'] = output_dir
             state['saved_analysis_filename'] = filename
             state['enhanced_file_tree_json'] = json_string
+            logging.info("===2===")
             global_state['dataset_state'] = state
+            logging.info("===3===")
             return Command(
                 goto=AgentTypeEnum.Supervisor.value,
                 update=await command_update(global_state),
@@ -177,6 +182,7 @@ class DatasetAgent:
                 state = DatasetAgentState()
             state['error_msg'] = error_message
             global_state['dataset_state'] = state
+            logging.info("===4===")
             return Command(
                 goto=AgentTypeEnum.Supervisor.value,
                 update=await command_update(global_state),
@@ -185,8 +191,7 @@ class DatasetAgent:
     async def _run_stage_1_setup(self, input_path: str, config: dict, decompress_func) -> (str, str):
         """阶段 1: 设置工作目录并解压源文件。"""
         logging.info("--- 阶段 1: 复制与解压 ---")
-        writer = get_stream_writer()
-        writer({"data": AiChatResultVO(text="--- 阶段 1: 复制与解压 ---\n").model_dump_json(exclude_none=True)})
+        await self.msg_box.write("--- 阶段 1: 复制与解压 ---\n\n").flush()
         base_name = os.path.basename(input_path.rstrip("/\\")).split(".")[0]
         run_output_dir = os.path.join(config["output_dir"], base_name)
 
@@ -204,8 +209,7 @@ class DatasetAgent:
         str, Any]:
         """阶段 2: 分析文件树结构。"""
         logging.info("--- 阶段 2: 分析文件树 ---")
-        writer = get_stream_writer()
-        writer({"data": AiChatResultVO(text="--- 阶段 2: 分析文件树 ---\n").model_dump_json(exclude_none=True)})
+        await self.msg_box.write("--- 阶段 2: 分析文件树 ---\n\n").flush()
         result = await asyncio.to_thread(
             analyze_func,
             dataset_root_dir=processed_dir,
@@ -220,8 +224,7 @@ class DatasetAgent:
     Dict[str, Any]:
         """阶段 3: 读取文件元数据并丰富文件树。"""
         logging.info("--- 阶段 3: 读取文件元数据 ---")
-        writer = get_stream_writer()
-        writer({"data": AiChatResultVO(text="--- 阶段 3: 读取文件元数据 ---\n").model_dump_json(exclude_none=True)})
+        await self.msg_box.write("--- 阶段 3: 读取文件元数据 ---\n\n").flush()
         sample_size = config["sample_size"]
 
         async def traverse_and_enrich(node: Dict[str, Any], current_path: str):
@@ -252,8 +255,7 @@ class DatasetAgent:
     async def _run_stage_4_enhance_tree(self, metadata_enriched_tree: dict, llm: BaseLanguageModel) -> Dict[str, Any]:
         """阶段 4: 使用AI进行语义增强。"""
         logging.info("--- 阶段 4: AI语义增强 ---")
-        writer = get_stream_writer()
-        writer({"data": AiChatResultVO(text="--- 阶段 4: AI语义增强 ---\n").model_dump_json(exclude_none=True)})
+        await self.msg_box.write("--- 阶段 4: AI语义增强 ---\n\n").flush()
         summary_stats = _extract_summary_statistics(metadata_enriched_tree)
 
         parser = PydanticOutputParser(pydantic_object=EnhancedFileTree)
@@ -268,8 +270,7 @@ class DatasetAgent:
     async def _run_stage_5_save_results(self, enhanced_tree_dict: dict, output_dir: str) -> (str, str):
         """阶段 5: 保存最终结果并完成。"""
         logging.info("--- 阶段 5: 保存并完成 ---")
-        writer = get_stream_writer()
-        writer({"data": AiChatResultVO(text="--- 阶段 5: 保存并完成 ---\n").model_dump_json(exclude_none=True)})
+        await self.msg_box.write("--- 阶段 5: 保存并完成 ---\n\n").flush()
 
         filename = "enhanced_analysis.json"
         output_file_path = os.path.join(output_dir, filename)

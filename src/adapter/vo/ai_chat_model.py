@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 
 class MessageVO(BaseModel):
+    message_id: str = None
     content: str
     role: str = None
     custom: str = None
@@ -15,6 +16,7 @@ class ChatInputVO(BaseModel):
 
 
 class AiChatResultVO(BaseModel):
+    message_id: str = None          # 消息id
     text: Optional[str] = None
-    html: Optional[str] = None
-    custom: Optional[Any] = None
+    type: str = 'stream'    # stream | block
+    role: str = 'assistant' # assistant | dataset_agent | code_agent | adapter_agent

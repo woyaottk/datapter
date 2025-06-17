@@ -1,39 +1,35 @@
-from langgraph.config import get_stream_writer
-from langgraph.types import Command
 import logging
 
-from src.adapter.vo.ai_chat_model import AiChatResultVO
+from langgraph.types import Command
+
 from src.domain.agent.code_analysis_agent import CodeAnalysisAgent
 from src.domain.constant.constant import AgentTypeEnum
 from src.domain.model.model import AdapterState, command_update
-
 from src.llm import LLMFactory, LLMType
 from src.utils.embedding_util import EmbeddingUtil
-
+from src.utils.msg_utils import MessageBox
 
 
 class ModelAgent:
     def __init__(self):
-        self.agent = CodeAnalysisAgent(chat_model=LLMFactory.create_llm(LLMType.DEEPSEEK_CHAT),reason_model=LLMFactory.create_llm(LLMType.DEEPSEEK_REASON),embedding_model=EmbeddingUtil())
+        self.agent = None
 
     async def __call__(self, state: AdapterState) -> Command:
+        await MessageBox.write_block("[ModelAgent] ModelAgent已被调用").flush()
+        self.agent = CodeAnalysisAgent(chat_model=LLMFactory.create_llm(LLMType.DEEPSEEK_CHAT),reason_model=LLMFactory.create_llm(LLMType.DEEPSEEK_REASON),embedding_model=EmbeddingUtil())
         try:
             path = state['model_path']
             out_path = state['model_analyse_path']
             logging.info(f"model_path: {path}")
             logging.info(f"model_analyse_path: {out_path}")
         except KeyError:
-            get_stream_writer()({
-                "data": AiChatResultVO(text="❌ No model path provided").model_dump_json(
-                    exclude_none=True
-                )
-            })
+            await MessageBox.write_block("[ModelAgent] ❌ No model path provided").flush()
             return Command(
                 goto=AgentTypeEnum.Supervisor.value,
                 update=await command_update(state),
             )
 
-        prompt = state['model_agent_prompt'][-1]
+        prompt = state['prompt'][-1]
         output = None
         for i in range(5):
             output = self.agent.action(path, prompt,out_path)
@@ -47,17 +43,9 @@ class ModelAgent:
             state['model_analyse'].append({'markdown':output['markdown'],"json_out":output['json_out'],
                     "summary":output['summary']})
 
-            get_stream_writer()({
-                "data": AiChatResultVO(text="✅resolve model successful").model_dump_json(
-                            exclude_none=True
-                        )
-            })
+            await MessageBox.write_block("[ModelAgent] ✅resolve model successful").flush()
         else:
-            get_stream_writer()({
-                        "data": AiChatResultVO(text="Can't resolve model").model_dump_json(
-                            exclude_none=True
-                        )
-                    })
+            await MessageBox.write_block("[ModelAgent] Can't resolve model").flush()
         return Command(
             goto=AgentTypeEnum.Supervisor.value,
             update=await command_update(state),
