@@ -1,7 +1,8 @@
 /myenv
 /logs/
 .idea/
-
+/data/
+chroma_db
 # Python cache files
 *.py[cod]
 *.pyc
@@ -46,3 +47,4 @@ wheels/
 env/
 venv/
 ENV/
+/src/domain/data/

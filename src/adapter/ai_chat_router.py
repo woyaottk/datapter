@@ -1,6 +1,8 @@
 import os
+import shutil
+import zipfile
 
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Path, Body
 from sse_starlette import EventSourceResponse, ServerSentEvent
 from starlette.responses import JSONResponse
 
@@ -16,14 +18,13 @@ router = APIRouter(
 )
 sf = Snowflake(worker_id=0, datacenter_id=0)
 
-# 使用相对路径
-DATA_DIR = "data"
-os.makedirs(DATA_DIR, exist_ok=True)
-
+# 文件上传路径
+ZIP_INPUT_DIR = os.getenv('ZIP_INPUT_DIR', 'data/input/zip')
+CODE_DIR = os.getenv('CODE.INPUT_DIR', 'data/input/code')
+DATASET_DIR = os.getenv('DATASET.INPUT_DIR', 'data/input/dataset')
 # 文件保存路径
-DATA_ZIP_PATH = os.path.join(DATA_DIR, "data.zip")
-MODEL_ZIP_PATH = os.path.join(DATA_DIR, "model.zip")
-
+DATASET_ZIP_PATH = os.path.join(ZIP_INPUT_DIR, "data.zip")
+CODE_ZIP_PATH = os.path.join(ZIP_INPUT_DIR, "code.zip")
 
 
 @router.post("/chat", summary="会话列表")
@@ -41,22 +42,37 @@ async def chat(request: ChatInputVO) -> EventSourceResponse:
         ),
     )
 
-
-
-@router.post("/upload/data", summary="上传 data.zip")
-async def upload_data(data_file: UploadFile = File(..., description="数据包ZIP文件")) -> JSONResponse:
-    # 保存 data_file 到 data/data.zip
-    with open(DATA_ZIP_PATH, "wb") as f:
-        f.write(await data_file.read())
-
-    return JSONResponse(content={"message": "Data file uploaded successfully.", "path": DATA_ZIP_PATH})
-
-
-@router.post("/upload/model", summary="上传 model.zip")
-async def upload_model(model_file: UploadFile = File(..., description="模型包ZIP文件")) -> JSONResponse:
-    # 保存 model_file 到 data/model.zip
-    with open(MODEL_ZIP_PATH, "wb") as f:
-        f.write(await model_file.read())
-
-    return JSONResponse(content={"message": "Model file uploaded successfully.", "path": MODEL_ZIP_PATH})
+@router.post("/upload/{mod}/{upload_type}", summary="上传模型或数据集")
+async def upload(
+    mod: str = Path(..., description="模型或数据集['model'|'dataset']"),
+    upload_type: str = Path(..., description="上传方式['zip'|'folder'|'files']"),
+    filename: str = Body(..., description="文件路径"),
+    file: UploadFile = File(..., description="模型或数据文件")
+) -> JSONResponse:
+    print(mod, upload_type, filename)
+    if mod in ['model', 'code']:
+        base_dir = CODE_DIR
+        zip_path = CODE_ZIP_PATH
+    elif mod == 'dataset':
+        base_dir = DATASET_DIR
+        zip_path = DATASET_ZIP_PATH
+    else:
+        raise ValueError('mod must be model/code or dataset')
+    os.makedirs(base_dir, exist_ok=True)
+    if upload_type == 'zip':
+        os.makedirs(ZIP_INPUT_DIR, exist_ok=True)
+        with open(zip_path, "wb") as f:
+            f.write(await file.read())
+        shutil.rmtree(base_dir, ignore_errors=True)
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(base_dir)
+    elif upload_type == 'folder':
+        if '/' in filename:
+            os.makedirs(os.path.join(base_dir, filename[:filename.rfind('/')]), exist_ok=True)
+        with open(os.path.join(base_dir, filename), "wb") as f:
+            f.write(await file.read())
+    elif upload_type == 'files':
+        with open(os.path.join(base_dir, filename), "wb") as f:
+            f.write(await file.read())
+    return JSONResponse(content={"message": "File uploaded successfully.", "path": base_dir})
 

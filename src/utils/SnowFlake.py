@@ -1,4 +1,5 @@
 # 64位ID的划分
+import logging
 import time
 
 
@@ -67,7 +68,7 @@ class Snowflake:
 
         # 时钟回拨
         if timestamp < self.last_timestamp:
-            print(
+            logging.info(
                 "clock is moving backwards. Rejecting requests until {}".format(
                     self.last_timestamp
                 )
