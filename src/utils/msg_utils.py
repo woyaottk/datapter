@@ -31,7 +31,7 @@ class MessageBox(object):
 
     async def flush(self):
         async for _ in self.async_gen():
-            print("flush")
+            pass
 
 
     # 异步生成器

@@ -1,9 +1,9 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, TypedDict
 
 from langgraph.graph import MessagesState
 
 
-class DatasetAgentState(MessagesState): # TODO 新增state，未在其他地方适配
+class DatasetAgentState(TypedDict): # TODO 新增state，未在其他地方适配
     """数据集Agent返回状态"""
     input_path: Optional[str]
     output_path: Optional[str]
@@ -22,6 +22,10 @@ class CollaborativeAgentState(MessagesState):
     target_base_path: str = "./"  # 添加目标基础路径，用于存储用户指定的根路径
     message_id:str
 
+class ModelAnalyze(TypedDict):
+    markdown: str
+    json_out: dict
+    summary: dict
 
 class AdapterState(MessagesState):
     """状态类，继承自MessagesState"""
@@ -41,7 +45,7 @@ class AdapterState(MessagesState):
     # model 相关
     model_path:str                  # 模型代码输入路径
     model_analyse_path:str
-    model_analyse:list[dict]        #  模型分析结果
+    model_analyse:list[ModelAnalyze] #  模型分析结果
     # dataset 相关
     dataset_path:str            # 数据集输入路径
     dataset_analyse:str         # json 格式

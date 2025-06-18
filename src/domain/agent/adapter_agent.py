@@ -1,6 +1,9 @@
+import json
+import logging
 import re
 from pathlib import Path
 from typing import List, Tuple
+from venv import logger
 
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate
@@ -46,7 +49,7 @@ SYSTEM_PROMPT = '''
    → 附带必要参数说明
 
 # 输出格式（强制执行）
-1. 先用自然语言输出你的思考和意图判断过程。
+1. 先用自然语言（中文为主）输出你的思考和意图判断过程。
 2. 指令部分（严格按格式）：
 {format_instructions}
 3. 思考过程部分输出完成后，直接输出指令部分，不要有其余输出。
@@ -140,8 +143,14 @@ class AdapterAgent:
         msg_box = MessageBox()
         await msg_box.write_block("AdapterAgent已被调用").flush()
         conversation_id = state['conversationId']
+        state['prompt'] = '' if not state['prompt'] else state['prompt']
         print(f'[AdapterAgent] called, state: {{"conversationId": {conversation_id}}}')
         print('这是Coordinator传递给我的prompt：' + state['prompt'])
+
+        logging.info(type(state['dataset_state']['enhanced_file_tree_json']))
+        logging.info(type(state['model_analyse'][-1]['markdown']))
+        logging.info(type(state['model_analyse'][-1]['json_out']))
+        logging.info(type(state['model_analyse'][-1]['summary']))
 
         prompt = '\n'.join(
             [
@@ -154,10 +163,11 @@ class AdapterAgent:
                 '\n',
                 '以下是模型代码分析结果：',
                 state['model_analyse'][-1]['markdown'],
-                state['model_analyse'][-1]['json_out'],
-                state['model_analyse'][-1]['summary'],
+                json.dumps(state['model_analyse'][-1]['json_out']),
+                json.dumps(state['model_analyse'][-1]['summary']),
             ]
         )
+        logging.info(prompt)
 
         prompts = ChatPromptTemplate.from_messages(
             [
@@ -165,6 +175,7 @@ class AdapterAgent:
                 ('user', '{prompt}'),
             ]
         )
+        logging.info(prompts)
         llm = await LLMFactory.async_create_llm(LLMType.QWEN)
         parser = PydanticOutputParser(pydantic_object=AdapterOutput)
         chain = prompts | llm

@@ -10,7 +10,7 @@ from sse_starlette.sse import AsyncContentStream, logger
 
 from src.adapter.vo.ai_chat_model import ChatInputVO, AiChatResultVO
 from src.domain.agent.coordinator_agent import CoordinatorAgent
-from src.domain.model.model import DatasetAgentState, AdapterState
+from src.domain.model.model import DatasetAgentState, AdapterState, ModelAnalyze
 from src.utils.SnowFlake import Snowflake
 
 state_cache = {}
@@ -38,7 +38,9 @@ async def chat_handler(request: ChatInputVO) -> AsyncContentStream:
 
             init_state = initialize_state(conversation_id, messages)
             # init_state = get_mock_state_4_dataset_agent(messages, conversation_id)
+            # init_state = get_mock_state_4_model_agent(messages, conversation_id)
             # init_state = get_mock_state_4_adapter_agent(messages, conversation_id)
+
 
             try:
                 ai_response_text = ""
@@ -93,22 +95,11 @@ def initialize_state(conversation_id: str, messages: list):
                                       output_path=os.getenv("DATASET.OUTPUT_DIR", "data/output/dataset"),
                                       saved_analysis_filename="",
                                       enhanced_file_tree_json="")
-    # with open(os.path.join(os.getenv("CODE.OUTPUT_DIR"), "code_analysis_20250617_065234.json"), "r") as f:
-    #     summary = f.read()
-    # with open(os.path.join(os.getenv("CODE.OUTPUT_DIR"), "code_analysis_report_20250617_065234.md"), "r") as f:
-    #     markdown = f.read()
-    # with open(os.path.join(os.getenv("CODE.OUTPUT_DIR"), "code_dataset_info_20250617_065234.json"), "r") as f:
-    #     json_out = f.read()
-    # model_analyse = {
-    #     "markdown": summary,
-    #     "json_out": markdown,
-    #     "summary": json_out,
-    # }
-    model_analyse = {
-        "markdown": "",
-        "json_out": "",
-        "summary": "",
-    }
+    model_analyse = ModelAnalyze(
+        markdown="",
+        json_out={},
+        summary={},
+    )
     return AdapterState(
         messages=messages,
         isInit=True,
@@ -140,29 +131,28 @@ def get_mock_state_4_dataset_agent(messages, conversation_id):
         nextPrompts= [prompt],
         model_path= os.getenv("CODE.INPUT_DIR"),
         model_analyse_path=os.getenv("CODE.OUTPUT_DIR"),
-        model_analyse=None,
+        model_analyse=[],
         dataset_state= dataset_state,
         context=""
     )
 
-def get_mock_state_4_code_agent(messages, conversation_id):
-    prompt = "请分析代码"
+def get_mock_state_4_model_agent(messages, conversation_id):
+    prompt = None
     return AdapterState(
         messages= messages,
         isInit= False,
         conversationId= conversation_id,
         messageId= str(sf.generate()),
-        nextAgents= ['CodeAgent'],
+        nextAgents= ['ModelAgent'],
         nextPrompts= [prompt],
         model_path= os.getenv("CODE.INPUT_DIR"),
         model_analyse_path=os.getenv("CODE.OUTPUT_DIR"),
-        model_analyse=None,
+        model_analyse=[],
         dataset_state= None,
         context=""
     )
 
 def get_mock_state_4_adapter_agent(messages, conversation_id):
-    #### mock state
     prompt = "请你根据代码和数据集的分析报告结果，给出将数据集适配至代码的方案。"
     with open(os.path.join(os.getenv("DATASET.OUTPUT_DIR"), "dataset/enhanced_analysis.json"), "r") as f:
         content = f.read()
@@ -173,11 +163,11 @@ def get_mock_state_4_adapter_agent(messages, conversation_id):
         markdown = f.read()
     with open(os.path.join(os.getenv("CODE.OUTPUT_DIR"), "code_dataset_info_20250617_065234.json"), "r") as f:
         json_out = f.read()
-    model_analyse = [{
-        "markdown": summary,
-        "json_out": markdown,
-        "summary": json_out,
-    }]
+    model_analyse = ModelAnalyze(
+        markdown=markdown,
+        json_out=json.loads(json_out),
+        summary=json.loads(summary),
+    )
     return AdapterState(
         messages= messages,
         isInit= False,
