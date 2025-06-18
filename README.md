@@ -13,7 +13,11 @@
 * 🧩 数据结构理解与抽象（支持 LLM 自动推理）
 * 🔁 源格式 → 中间表示 → 目标格式 的自动映射转换
 * 🧱 模块化适配器生成（支持分阶段调用）
-* ✅ 自动测试与验证机制（规划中）
+* 📊 多模态数据集分析（支持图像、文本、表格等）
+* 📝 模型代码结构智能分析
+* 🔍 智能文件树分析与元数据提取
+* 🎯 自动代码生成与适配
+* ✅ 自动测试与验证机制
 
 ---
 
@@ -26,14 +30,27 @@ datapter/
 ├── adapter/                  # 对接层（接口适配、日志）
 │   └── vo/                   # 输入输出数据对象
 ├── app/                      # 服务层（Agent 编排）
-├── domain/                  
-│   ├── constant/             # 常量定义
-│   └── model/                # 各类智能体模型
-│       ├── coordinator_agent.py  # 调度与任务分解
-│       ├── demo_agent.py         # 示例适配 Agent
-│       └── demo2_agent.py        # 备用适配逻辑
-├── utils/                    # 工具类（大模型调用、ID 生成等）
-├── main.py                   # 项目入口
+├── domain/                   # 领域层
+│   ├── agent/               # 智能体实现
+│   │   ├── coordinator_agent.py    # 协调调度智能体
+│   │   ├── model_agent.py          # 代码分析智能体
+│   │   ├── dataset_agent.py        # 数据集分析智能体
+│   │   └── adapter_agent.py        # 适配器生成智能体
+│   ├── constant/            # 常量定义
+│   └── model/               # 领域模型
+├── llm/                     # LLM 集成层
+│   ├── factory/            # LLM 工厂实现
+│   └── model/              # LLM 模型定义
+├── tools/                   # 工具类
+│   ├── ArchiveDecompressionTool.py  # 压缩文件处理
+│   ├── FileTreeAnalysisTool.py      # 文件树分析
+│   ├── MetaFileReadTool.py          # 元数据读取
+│   └── ...                 # 其他工具
+├── utils/                   # 通用工具类
+│   ├── embedding_util.py    # 向量嵌入工具
+│   ├── msg_utils.py         # 消息处理工具
+│   └── SnowFlake.py         # ID 生成器
+├── main.py                  # 项目入口
 ├── requirements.txt
 └── README.md
 ```
@@ -42,10 +59,29 @@ datapter/
 
 ## 🚀 快速开始
 
+### 0. 克隆项目
+
+克隆时请将子模块一并拉取
+```bash
+git clone --recursive https://github.com/woyaottk/datapter.git
+```
+如果已经 clone 过，请更新子模块
+```bash
+git submodule update --init
+```
+
 ### 1. 安装依赖
 
+#### 1.1 安装前端依赖
 ```bash
-# 推荐使用虚拟环境
+cd datapter-frontend
+npm install
+cd ..
+```
+
+#### 1.2 安装后端依赖
+```bash
+# 推荐使用虚拟环境()
 pip install -r requirements.txt
 ```
 
@@ -56,69 +92,75 @@ conda env create -f environment.yml
 conda activate datapter
 ```
 
-### 2. 运行示例
+### 2. 修改配置
+#### 2.1 前端配置
+前端配置文件位于`datapter-frontend/.env`，可配置请求的后端地址
+```env
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8080
+```
+#### 2.2 后端配置
+后端配置文件需将 `.env.example` 复制一份为`.env`
 
+可配置：前端地址，API key，代码及数据集输入保存地址，分析结果输出地址等
+
+必须确保以下配置正确提供：
+```env
+FRONTEND_URL="http://localhost:3000"
+MODELSCOPE.API_KEY=YOUR_API_KEY
+DEEPSEEK.API_KEY=YOUR_API_KEY
+MISTRAL_API_KEY=YOUR_API_KEY
+```
+
+### 3. 启动运行
+#### 3.1 启动前端服务
+```bash
+cd datapter-frontend
+npm run dev
+```
+启动后控制台会输出前端服务地址
+
+#### 3.2 启动后端服务
 ```bash
 python main.py
 ```
 
-### 3. 测试curl
+### 4. demo演示
+在浏览器中访问 **前端服务地址** 即可访问项目。
+效果如下：
+![frontend-ui](docs/pics/frontend-ui.png)
 
-**聊天接口**
-```curl
-curl --request POST \
-  --url http://localhost:8080/aichat/chat \
-  --header 'Accept: */*' \
-  --header 'Accept-Encoding: gzip, deflate, br' \
-  --header 'Connection: keep-alive' \
-  --header 'Content-Type: application/json' \
-  --header 'User-Agent: PostmanRuntime-ApipostRuntime/1.1.0' \
-  --data '{
-    "conversation_id": "1919358918656524289",
-    "messages": [
-        {
-            "role": "user",
-            "content": "code and model limit 10 world"
-        }
-    ]
-}'
-```
+文件上传方式有三种：
+- 上传文件
+- 上传文件夹
+- 上传zip压缩包
 
-**上传数据集接口**
-```curl
-curl -X POST "http://localhost:8080/aichat/upload/data" \
-  -H "accept: application/json" \
-  -H "Content-Type: multipart/form-data" \
-  -F "data_file=@/path/to/your/data.zip"
-```
+上传后可以输入prompt，如：
+`模型代码和数据集已经上传，请帮我分析它们的结构，给出一个适配方案，让数据集能在模型上跑起来`
 
-**上传模型接口**
-```curl
-curl -X POST "http://localhost:8080/aichat/upload/model" \
-  -H "accept: application/json" \
-  -H "Content-Type: multipart/form-data" \
-  -F "model_file=@/path/to/your/model.zip"
-```
-可在配置中自定义目标模型、适配策略、日志等级等参数。
-
+效果如下：
+![img.png](docs/pics/img.png)
 ---
 
-## 🧬 Agent 模块说明
+## 🧬 智能体模块说明
 
-| Agent 文件               | 功能描述                 |
-| ---------------------- | -------------------- |
-| `coordinator_agent.py` | 协调多个子 Agent，完成适配任务调度 |
-| `demo_agent.py`        | 简单规则映射的演示适配器         |
-| `demo2_agent.py`       | 更复杂或多阶段适配逻辑的实现       |
+| 智能体文件                  | 功能描述        |
+|------------------------|-------------|
+| `coordinator_agent.py` | 协调调度智能体     |
+| `dataset_agent.py`     | 数据集分析与处理智能体 |
+| `model_agent.py`       | 代码分析与理解智能体  |
+| `adapter_agent.py`     | 数据代码适配智能体   |
 
----
+### 数据集分析智能体工作流程
+1. 制作副本并递归解压所有压缩包
+2. 分析文件树结构并保存
+3. 分析元数据补充文件树
+4. 输入到大模型中增强文件树
+5. 保存结果
 
-## 📦 示例能力
-
-* ✅ JSON → CSV → PyTorch Dataset
-* ✅ COCO → YOLO → MMDetection
-* ✅ 结构化文本 → Prompt 模板 → Transformers 格式
-* ✅ 自定义字段提取与重组
+### 支持的文件类型
+- 图像：`.jpg`, `.jpeg`, `.png`, `.bmp`, `.gif`
+- 文本：`.csv`, `.json`, `.jsonl`, `.txt`
+- 表格：`.parquet`
 
 ---
 
@@ -126,9 +168,9 @@ curl -X POST "http://localhost:8080/aichat/upload/model" \
 
 * Python 3.12+
 * langgraph
-* FastAPI（如用于后续服务化）
-* OpenAI / LLM 接口（如 `llm_util.py` 中封装）
-* Snowflake ID 生成器（见 `SnowFlake.py`）
+* FastAPI
+* OpenAI / 通义千问 / DeepSeek API
+* Snowflake ID 生成器
 
 ---
 
